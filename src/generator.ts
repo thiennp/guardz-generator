@@ -579,31 +579,31 @@ ${indent}}`;
     // Always include isType since it's the base function
     usedUtilities.add('isType');
     
-    // Check for specific utilities in the generated code
+    // Check for specific utilities in the generated code using word boundaries
     const utilityChecks = [
-      { pattern: 'isString', utility: 'isString' },
-      { pattern: 'isNumber', utility: 'isNumber' },
-      { pattern: 'isBoolean', utility: 'isBoolean' },
-      { pattern: 'isDate', utility: 'isDate' },
-      { pattern: 'isArrayWithEachItem', utility: 'isArrayWithEachItem' },
-      { pattern: 'isObjectWithEachItem', utility: 'isObjectWithEachItem' },
-      { pattern: 'isUndefinedOr', utility: 'isUndefinedOr' },
-      { pattern: 'isNullOr', utility: 'isNullOr' },
-      { pattern: 'isOneOf', utility: 'isOneOf' },
-      { pattern: 'isOneOfTypes', utility: 'isOneOfTypes' },
-      { pattern: 'isEqualTo', utility: 'isEqualTo' },
-      { pattern: 'isAny', utility: 'isAny' },
-      { pattern: 'isUnknown', utility: 'isUnknown' },
-      { pattern: 'isEnum', utility: 'isEnum' },
-      { pattern: 'isNonEmptyString', utility: 'isNonEmptyString' },
-      { pattern: 'isNonNegativeNumber', utility: 'isNonNegativeNumber' },
-      { pattern: 'isPositiveNumber', utility: 'isPositiveNumber' },
-      { pattern: 'isNonEmptyArrayWithEachItem', utility: 'isNonEmptyArrayWithEachItem' },
-      { pattern: 'isPartialOf', utility: 'isPartialOf' }
+      { pattern: /\bisString\b/, utility: 'isString' },
+      { pattern: /\bisNumber\b/, utility: 'isNumber' },
+      { pattern: /\bisBoolean\b/, utility: 'isBoolean' },
+      { pattern: /\bisDate\b/, utility: 'isDate' },
+      { pattern: /\bisArrayWithEachItem\b/, utility: 'isArrayWithEachItem' },
+      { pattern: /\bisObjectWithEachItem\b/, utility: 'isObjectWithEachItem' },
+      { pattern: /\bisUndefinedOr\b/, utility: 'isUndefinedOr' },
+      { pattern: /\bisNullOr\b/, utility: 'isNullOr' },
+      { pattern: /\bisOneOf\b/, utility: 'isOneOf' },
+      { pattern: /\bisOneOfTypes\b/, utility: 'isOneOfTypes' },
+      { pattern: /\bisEqualTo\b/, utility: 'isEqualTo' },
+      { pattern: /\bisAny\b/, utility: 'isAny' },
+      { pattern: /\bisUnknown\b/, utility: 'isUnknown' },
+      { pattern: /\bisEnum\b/, utility: 'isEnum' },
+      { pattern: /\bisNonEmptyString\b/, utility: 'isNonEmptyString' },
+      { pattern: /\bisNonNegativeNumber\b/, utility: 'isNonNegativeNumber' },
+      { pattern: /\bisPositiveNumber\b/, utility: 'isPositiveNumber' },
+      { pattern: /\bisNonEmptyArrayWithEachItem\b/, utility: 'isNonEmptyArrayWithEachItem' },
+      { pattern: /\bisPartialOf\b/, utility: 'isPartialOf' }
     ];
     
     for (const check of utilityChecks) {
-      if (typeGuardCode.includes(check.pattern)) {
+      if (check.pattern.test(typeGuardCode)) {
         usedUtilities.add(check.utility);
       }
     }
