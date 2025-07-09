@@ -1,6 +1,6 @@
-import type { Level2 } from './../dtos/EverythingDTO';
+import type { Level2 } from './PrimitiveTypes';
 import { isArrayWithEachItem, isType } from 'guardz';
-import { isLevel3 } from './../dtos/isLevel3';
+import { isLevel3 } from './isLevel3';
 
 export const isLevel2 = isType<Level2>({
   mid: isLevel3,

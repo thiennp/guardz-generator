@@ -1,4 +1,4 @@
-import type { PrimitiveTypes } from './dtos/EverythingDTO';
+import type { PrimitiveTypes } from './test-types-comprehensive';
 import { isAny, isBoolean, isDate, isNumber, isString, isType, isUnknown } from 'guardz';
 
 export const isPrimitiveTypes = isType<PrimitiveTypes>({

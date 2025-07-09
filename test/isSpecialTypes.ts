@@ -1,4 +1,4 @@
-import type { SpecialTypes } from './dtos/EverythingDTO';
+import type { SpecialTypes } from './test-types-comprehensive';
 import { isNonEmptyString, isNonNegativeNumber, isPositiveNumber, isType } from 'guardz';
 
 export const isSpecialTypes = isType<SpecialTypes>({

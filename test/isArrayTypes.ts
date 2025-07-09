@@ -1,4 +1,4 @@
-import type { ArrayTypes } from './dtos/EverythingDTO';
+import type { ArrayTypes } from './test-types-comprehensive';
 import { isArrayWithEachItem, isNullOr, isNumber, isString, isType } from 'guardz';
 
 export const isArrayTypes = isType<ArrayTypes>({

@@ -1,4 +1,4 @@
-import type { NullableTypes } from './dtos/EverythingDTO';
+import type { NullableTypes } from './test-types-comprehensive';
 import { isBoolean, isDate, isNullOr, isNumber, isString, isType, isUndefinedOr } from 'guardz';
 
 export const isNullableTypes = isType<NullableTypes>({

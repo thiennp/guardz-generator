@@ -1,5 +1,5 @@
-import type { EnumTypes } from './dtos/EverythingDTO';
-import { StatusEnum } from './dtos/EverythingDTO';
+import type { EnumTypes } from './test-types-comprehensive';
+import { StatusEnum } from './test-types-comprehensive';
 import { isBoolean, isEnum, isEqualTo, isNumber, isOneOf, isOneOfTypes, isString, isType } from 'guardz';
 
 export const isEnumTypes = isType<EnumTypes>({

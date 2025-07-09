@@ -1,4 +1,4 @@
-import type { ArrayTypes } from './EverythingDTO';
+import type { ArrayTypes } from './../models/PrimitiveTypes';
 import { isArrayWithEachItem, isNullOr, isNumber, isString, isType } from 'guardz';
 
 export const isArrayTypes = isType<ArrayTypes>({
