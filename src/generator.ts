@@ -198,16 +198,8 @@ export class TypeGuardGenerator {
     // For type unions like string | number | boolean, use isOneOfTypes
     // 1. Extract type names and their corresponding guard expressions
     const typePairs = types.map((type: ts.TypeNode) => {
-      let typeName = '';
-      if (ts.isTypeReferenceNode(type)) {
-        typeName = type.typeName.getText();
-      } else if (ts.isLiteralTypeNode(type)) {
-        typeName = type.getText();
-      } else if (ts.isTypeLiteralNode(type)) {
-        typeName = type.getText();
-      } else {
-        typeName = type.getText();
-      }
+      // Use getText() to preserve generic type parameters
+      const typeName = type.getText();
       return {
         typeName,
         guard: this.convertTypeToGuard(type)
@@ -625,9 +617,9 @@ ${indent}}`;
   // Collect type guard functions used in the generated typeguard code
   private collectUsedTypeGuards(typeGuardCode: string): string[] {
     const usedTypeGuards = new Set<string>();
-    // Match type guard function calls and property values (isXxx followed by parentheses, commas, end of line, or used as values)
-    // Improved regex: match isXxx as function call, argument, or property value
-    const typeGuardPattern = /\bis([A-Z][a-zA-Z0-9_]*)\b(?=\s*[,(]|\s*\)|\s*$|\s*:|\s*}|\s*\[)/g;
+    // Match type guard function calls (isXxx followed by parentheses or used as arguments)
+    // More specific pattern: match isXxx only when it's a function call or argument
+    const typeGuardPattern = /\bis([A-Z][a-zA-Z0-9_]*)\b(?=\s*\(|\s*,|\s*\))/g;
     let match;
     const guardzUtilities = [
       'isString', 'isNumber', 'isBoolean', 'isDate', 'isArrayWithEachItem', 
