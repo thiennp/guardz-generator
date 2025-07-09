@@ -4,11 +4,11 @@ import { isArrayWithEachItem, isDate, isString, isType, isUndefinedOr } from 'gu
 export function isComplexRecursive(value: unknown): value is ComplexRecursive {
   return isType<ComplexRecursive>({
     name: isString,
-  metadata: isType({
+    metadata: isType({
     created: isDate,
     updated: isDate
   }),
-  children: isArrayWithEachItem(isComplexRecursive),
-  parent: isUndefinedOr(isComplexRecursive)
+    children: isArrayWithEachItem(isComplexRecursive),
+    parent: isUndefinedOr(isComplexRecursive)
   })(value);
 }
