@@ -535,7 +535,7 @@ ${indent}}`;
     const allImports = [typeImports, enumImports, guardzImports, typeGuardImports].filter(Boolean);
     const importsSection = allImports.join('\n');
     
-    return `${importsSection}${importsSection ? '\n' : ''}${typeGuardCode}\n`;
+    return `${importsSection}${importsSection ? '\n\n' : ''}${typeGuardCode}\n`;
   }
 
   // Collect enums used in the generated typeguard code
