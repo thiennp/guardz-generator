@@ -310,23 +310,30 @@ export class TypeGuardGenerator {
     }
   }
 
-  private handleTypeLiteral(typeLiteral: ts.TypeLiteralNode, wrapInIsType: boolean = true): string {
+  private handleTypeLiteral(typeLiteral: ts.TypeLiteralNode, wrapInIsType: boolean = true, indent: string = '  '): string {
+    const nextIndent = indent + '  ';
     const properties = typeLiteral.members.map((member: ts.TypeElement) => {
       if (ts.isPropertySignature(member) && member.name && member.type) {
         const name = member.name.getText();
-        const typeGuard = this.convertTypeToGuard(member.type);
+        let typeGuard: string;
+        // If the type is a type literal, recursively call with increased indent
+        if (ts.isTypeLiteralNode(member.type)) {
+          typeGuard = this.handleTypeLiteral(member.type, true, nextIndent);
+        } else {
+          typeGuard = this.convertTypeToGuard(member.type);
+        }
         const isOptional = member.questionToken !== undefined;
         if (isOptional) {
-          return `  ${name}: isUndefinedOr(${typeGuard})`;
+          return `${indent}${name}: isUndefinedOr(${typeGuard})`;
         } else {
-          return `  ${name}: ${typeGuard}`;
+          return `${indent}${name}: ${typeGuard}`;
         }
       }
       return '';
     }).filter(Boolean);
     const objectLiteral = `{
 ${properties.join(',\n')}
-}`;
+${indent.slice(2)}}`;
     return wrapInIsType ? `isType(${objectLiteral})` : objectLiteral;
   }
 

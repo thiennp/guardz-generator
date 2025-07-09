@@ -53,7 +53,6 @@ ehthumbs.db
 Thumbs.db
 
 # Generated test files (created by the generator)
-test/**/is*.ts
 test/**/test-runner.js
 
 # Temporary files
