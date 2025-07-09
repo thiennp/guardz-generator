@@ -54,6 +54,7 @@ Thumbs.db
 
 # Generated test files (created by the generator)
 test/**/test-runner.js
+dummy-test/
 
 # Temporary files
 .tmp/

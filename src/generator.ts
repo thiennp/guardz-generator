@@ -34,14 +34,19 @@ export class TypeGuardGenerator {
 
   generateAllTypeGuards(options: Partial<TypeGuardOptions> = {}): GeneratedFile[] {
     const interfaces: ts.InterfaceDeclaration[] = [];
+    const typeAliases: ts.TypeAliasDeclaration[] = [];
+    
     for (const sourceFile of this.sourceFiles) {
       ts.forEachChild(sourceFile, (node: ts.Node) => {
         if (ts.isInterfaceDeclaration(node)) {
           interfaces.push(node);
+        } else if (ts.isTypeAliasDeclaration(node)) {
+          typeAliases.push(node);
         }
       });
     }
-    return interfaces.map(interfaceDecl => {
+    
+    const interfaceFiles = interfaces.map(interfaceDecl => {
       const guardName = options.guardName || `is${interfaceDecl.name.text}`;
       const typeGuardCode = this.generateTypeGuardCode(interfaceDecl, guardName);
       const fileName = `${guardName}.ts`;
@@ -54,6 +59,22 @@ export class TypeGuardGenerator {
         interfaceName: interfaceDecl.name.text
       };
     });
+
+    const typeAliasFiles = typeAliases.map(typeAliasDecl => {
+      const guardName = options.guardName || `is${typeAliasDecl.name.text}`;
+      const typeGuardCode = this.generateGenericTypeGuardCode(typeAliasDecl, guardName);
+      const fileName = `${guardName}.ts`;
+      // Place the generated file in the same directory as the type alias definition
+      const outputDir = path.dirname(typeAliasDecl.getSourceFile().fileName);
+      const importTypes = this.collectReferencedTypesFromTypeAlias(typeAliasDecl);
+      return {
+        fileName: path.join(outputDir, fileName),
+        content: this.generateCompleteFile(guardName, typeGuardCode, typeAliasDecl.name.text, importTypes, fileName, outputDir),
+        interfaceName: typeAliasDecl.name.text
+      };
+    });
+
+    return [...interfaceFiles, ...typeAliasFiles];
   }
 
   private findInterfaceWithSourceFile(interfaceName: string): [ts.InterfaceDeclaration, ts.SourceFile] | null {
@@ -71,18 +92,47 @@ export class TypeGuardGenerator {
     return null;
   }
 
-  generateTypeGuard(interfaceName: string, options: Partial<TypeGuardOptions> = {}): string {
-    const found = this.findInterfaceWithSourceFile(interfaceName);
-    if (!found) {
-      throw new Error(`Interface '${interfaceName}' not found in source files`);
+  private findTypeAliasWithSourceFile(typeName: string): [ts.TypeAliasDeclaration, ts.SourceFile] | null {
+    for (const sourceFile of this.sourceFiles) {
+      let found: ts.TypeAliasDeclaration | null = null;
+      ts.forEachChild(sourceFile, (node: ts.Node) => {
+        if (ts.isTypeAliasDeclaration(node) && node.name.text === typeName && !found) {
+          found = node;
+        }
+      });
+      if (found) {
+        return [found, sourceFile];
+      }
     }
-    const [targetInterface] = found;
-    const guardName = options.guardName || `is${interfaceName}`;
-    const typeGuardCode = this.generateTypeGuardCode(targetInterface, guardName);
-    const importTypes = this.collectReferencedTypes(targetInterface);
-    const outputDir = path.dirname(targetInterface.getSourceFile().fileName);
-    const fileName = `${guardName}.ts`;
-    return this.generateCompleteFile(guardName, typeGuardCode, interfaceName, importTypes, fileName, outputDir);
+    return null;
+  }
+
+  generateTypeGuard(typeName: string, options: Partial<TypeGuardOptions> = {}): string {
+    // First try to find as interface
+    const interfaceFound = this.findInterfaceWithSourceFile(typeName);
+    if (interfaceFound) {
+      const [targetInterface] = interfaceFound;
+      const guardName = options.guardName || `is${typeName}`;
+      const typeGuardCode = this.generateTypeGuardCode(targetInterface, guardName);
+      const importTypes = this.collectReferencedTypes(targetInterface);
+      const outputDir = path.dirname(targetInterface.getSourceFile().fileName);
+      const fileName = `${guardName}.ts`;
+      return this.generateCompleteFile(guardName, typeGuardCode, typeName, importTypes, fileName, outputDir);
+    }
+    
+    // Then try to find as type alias
+    const typeAliasFound = this.findTypeAliasWithSourceFile(typeName);
+    if (typeAliasFound) {
+      const [targetTypeAlias] = typeAliasFound;
+      const guardName = options.guardName || `is${typeName}`;
+      const typeGuardCode = this.generateGenericTypeGuardCode(targetTypeAlias, guardName);
+      const importTypes = this.collectReferencedTypesFromTypeAlias(targetTypeAlias);
+      const outputDir = path.dirname(targetTypeAlias.getSourceFile().fileName);
+      const fileName = `${guardName}.ts`;
+      return this.generateCompleteFile(guardName, typeGuardCode, typeName, importTypes, fileName, outputDir);
+    }
+    
+    throw new Error(`Type '${typeName}' not found in source files`);
   }
 
   writeTypeGuardsToFiles(generatedFiles: GeneratedFile[], outputDir: string): void {
@@ -112,6 +162,39 @@ export class TypeGuardGenerator {
     } else {
       // For non-recursive types, use const assignment
       return `export const ${guardName} = isType<${interfaceDecl.name.text}>({\n${propertyGuards}\n});`;
+    }
+  }
+
+  private generateGenericTypeGuardCode(typeAliasDecl: ts.TypeAliasDeclaration, guardName: string): string {
+    const typeParameters = this.extractTypeParameters(typeAliasDecl);
+    
+    if (typeParameters.length === 0) {
+      // Non-generic type alias, treat like interface
+      if (ts.isTypeLiteralNode(typeAliasDecl.type)) {
+        const properties = this.extractPropertiesFromTypeLiteral(typeAliasDecl.type);
+        const propertyGuards = properties.map(prop => `  ${this.generatePropertyGuard(prop)}`).join(',\n');
+        return `export const ${guardName} = isType<${typeAliasDecl.name.text}>({\n${propertyGuards}\n});`;
+      } else {
+        // Simple type alias like: type MyString = string
+        const typeGuard = this.convertTypeToGuard(typeAliasDecl.type);
+        return `export const ${guardName} = ${typeGuard};`;
+      }
+    } else {
+      // Generic type alias
+      const typeParameterNames = typeParameters.map(tp => tp.name);
+      const typeGuardParams = typeParameters.map(tp => `typeGuard${tp.name}: TypeGuardFn<${tp.name}>`);
+      const genericTypeString = `${typeAliasDecl.name.text}<${typeParameterNames.join(', ')}>`;
+      
+      if (ts.isTypeLiteralNode(typeAliasDecl.type)) {
+        const properties = this.extractPropertiesFromTypeLiteral(typeAliasDecl.type);
+        const propertyGuards = properties.map(prop => `    ${this.generatePropertyGuardForGeneric(prop, typeParameterNames)}`).join(',\n');
+        
+        return `export const ${guardName} = <${typeParameterNames.join(', ')}>(${typeGuardParams.join(', ')}) => isType<${genericTypeString}>({\n${propertyGuards}\n});`;
+      } else {
+        // Simple generic type alias
+        const typeGuard = this.convertTypeToGuardForGeneric(typeAliasDecl.type, typeParameterNames);
+        return `export const ${guardName} = <${typeParameterNames.join(', ')}>(${typeGuardParams.join(', ')}) => ${typeGuard};`;
+      }
     }
   }
 
@@ -170,6 +253,50 @@ export class TypeGuardGenerator {
     return properties;
   }
 
+  private extractPropertiesFromTypeLiteral(typeLiteral: ts.TypeLiteralNode): Array<{
+    name: string;
+    type: ts.TypeNode;
+    isOptional: boolean;
+  }> {
+    const properties: Array<{
+      name: string;
+      type: ts.TypeNode;
+      isOptional: boolean;
+    }> = [];
+    typeLiteral.members.forEach((member: ts.TypeElement) => {
+      if (ts.isPropertySignature(member) && member.name) {
+        const name = member.name.getText();
+        const type = member.type;
+        const isOptional = member.questionToken !== undefined;
+        if (type) {
+          properties.push({ name, type, isOptional });
+        }
+      }
+    });
+    return properties;
+  }
+
+  private extractTypeParameters(typeAliasDecl: ts.TypeAliasDeclaration): Array<{
+    name: string;
+    constraint?: ts.TypeNode;
+  }> {
+    const typeParameters: Array<{
+      name: string;
+      constraint?: ts.TypeNode;
+    }> = [];
+    
+    if (typeAliasDecl.typeParameters) {
+      typeAliasDecl.typeParameters.forEach((typeParam: ts.TypeParameterDeclaration) => {
+        typeParameters.push({
+          name: typeParam.name.text,
+          constraint: typeParam.constraint
+        });
+      });
+    }
+    
+    return typeParameters;
+  }
+
   private generatePropertyGuard(property: {
     name: string;
     type: ts.TypeNode;
@@ -177,6 +304,20 @@ export class TypeGuardGenerator {
   }): string {
     const typeGuard = this.convertTypeToGuard(property.type);
     console.log(`Debug: Property ${property.name} generated guard: ${typeGuard}`);
+    if (property.isOptional) {
+      return `${property.name}: isUndefinedOr(${typeGuard})`;
+    } else {
+      return `${property.name}: ${typeGuard}`;
+    }
+  }
+
+  private generatePropertyGuardForGeneric(property: {
+    name: string;
+    type: ts.TypeNode;
+    isOptional: boolean;
+  }, typeParameterNames: string[]): string {
+    const typeGuard = this.convertTypeToGuardForGeneric(property.type, typeParameterNames);
+    console.log(`Debug: Property ${property.name} generated generic guard: ${typeGuard}`);
     if (property.isOptional) {
       return `${property.name}: isUndefinedOr(${typeGuard})`;
     } else {
@@ -193,6 +334,22 @@ export class TypeGuardGenerator {
       return this.handleTypeLiteral(typeNode);
     } else if (ts.isArrayTypeNode(typeNode)) {
       return this.handleArrayType(typeNode);
+    } else if (ts.isLiteralTypeNode(typeNode)) {
+      return this.handleLiteralType(typeNode);
+    } else {
+      return this.handlePrimitiveType(typeNode);
+    }
+  }
+
+  private convertTypeToGuardForGeneric(typeNode: ts.TypeNode, typeParameterNames: string[]): string {
+    if (ts.isUnionTypeNode(typeNode)) {
+      return this.handleUnionTypeForGeneric(typeNode, typeParameterNames);
+    } else if (ts.isTypeReferenceNode(typeNode)) {
+      return this.handleTypeReferenceForGeneric(typeNode, typeParameterNames);
+    } else if (ts.isTypeLiteralNode(typeNode)) {
+      return this.handleTypeLiteralForGeneric(typeNode, typeParameterNames);
+    } else if (ts.isArrayTypeNode(typeNode)) {
+      return this.handleArrayTypeForGeneric(typeNode, typeParameterNames);
     } else if (ts.isLiteralTypeNode(typeNode)) {
       return this.handleLiteralType(typeNode);
     } else {
@@ -415,6 +572,84 @@ ${indent}}`;
     }
   }
 
+  private handleUnionTypeForGeneric(unionType: ts.UnionTypeNode, typeParameterNames: string[]): string {
+    const types = unionType.types;
+    if (types.length === 2) {
+      const typeText = unionType.getText();
+      if (typeText === 'string | null') {
+        return 'isNullOr(isString)';
+      }
+      if (typeText === 'string | undefined') {
+        return 'isUndefinedOr(isString)';
+      }
+      if (typeText === 'number | undefined') {
+        return 'isUndefinedOr(isNumber)';
+      }
+      if (typeText === 'boolean | undefined') {
+        return 'isUndefinedOr(isBoolean)';
+      }
+      if (typeText === 'Date | undefined') {
+        return 'isUndefinedOr(isDate)';
+      }
+    }
+
+    // For type unions like string | number | boolean, use isOneOfTypes
+    const typePairs = types.map((type: ts.TypeNode) => {
+      const typeName = type.getText();
+      return {
+        typeName,
+        guard: this.convertTypeToGuardForGeneric(type, typeParameterNames)
+      };
+    });
+    typePairs.sort((a, b) => a.typeName.localeCompare(b.typeName));
+    const genericType = typePairs.map(pair => pair.typeName).join(' | ');
+    const guardArgs = typePairs.map(pair => pair.guard).join(', ');
+    return `isOneOfTypes<${genericType}>(${guardArgs})`;
+  }
+
+  private handleTypeReferenceForGeneric(typeRef: ts.TypeReferenceNode, typeParameterNames: string[]): string {
+    const typeName = typeRef.typeName.getText();
+    
+    // Check if this is a generic type parameter
+    if (typeParameterNames.includes(typeName)) {
+      return `typeGuard${typeName}`;
+    }
+    
+    // Otherwise, use regular type reference handling
+    return this.handleTypeReference(typeRef);
+  }
+
+  private handleTypeLiteralForGeneric(typeLiteral: ts.TypeLiteralNode, typeParameterNames: string[], indent: string = '  '): string {
+    const nextIndent = indent + '  ';
+    const properties = typeLiteral.members.map((member: ts.TypeElement) => {
+      if (ts.isPropertySignature(member) && member.name && member.type) {
+        const name = member.name.getText();
+        let typeGuard: string;
+        if (ts.isTypeLiteralNode(member.type)) {
+          typeGuard = this.handleTypeLiteralForGeneric(member.type, typeParameterNames, nextIndent);
+        } else {
+          typeGuard = this.convertTypeToGuardForGeneric(member.type, typeParameterNames);
+        }
+        const isOptional = member.questionToken !== undefined;
+        if (isOptional) {
+          return `${nextIndent}${name}: isUndefinedOr(${typeGuard})`;
+        } else {
+          return `${nextIndent}${name}: ${typeGuard}`;
+        }
+      }
+      return '';
+    }).filter(Boolean);
+    const objectLiteral = `{
+${properties.join(',\n')}
+${indent}}`;
+    return `isType(${objectLiteral})`;
+  }
+
+  private handleArrayTypeForGeneric(arrayType: ts.ArrayTypeNode, typeParameterNames: string[]): string {
+    const elementType = this.convertTypeToGuardForGeneric(arrayType.elementType, typeParameterNames);
+    return `isArrayWithEachItem(${elementType})`;
+  }
+
   private isEnumType(typeName: string): boolean {
     for (const sourceFile of this.sourceFiles) {
       let found = false;
@@ -476,6 +711,41 @@ ${indent}}`;
         visit(member.type);
       }
     });
+    
+    return Array.from(referenced);
+  }
+
+  // Collect all referenced types/interfaces/enums for import from type alias
+  private collectReferencedTypesFromTypeAlias(typeAliasDecl: ts.TypeAliasDeclaration): string[] {
+    const referenced = new Set<string>();
+    referenced.add(typeAliasDecl.name.text);
+    
+    const visit = (typeNode: ts.TypeNode | undefined) => {
+      if (!typeNode) return;
+      if (ts.isTypeReferenceNode(typeNode)) {
+        const typeName = typeNode.typeName.getText();
+        // Don't add enums to type imports since they're used at runtime
+        // Don't add built-in types that don't need imports
+        if (!this.isEnumType(typeName) && !this.isBuiltInType(typeName) && !this.isTypeAlias(typeName)) {
+          referenced.add(typeName);
+        }
+        if (typeNode.typeArguments) {
+          typeNode.typeArguments.forEach(visit);
+        }
+      } else if (ts.isArrayTypeNode(typeNode)) {
+        visit(typeNode.elementType);
+      } else if (ts.isUnionTypeNode(typeNode)) {
+        typeNode.types.forEach(visit);
+      } else if (ts.isTypeLiteralNode(typeNode)) {
+        typeNode.members.forEach((member: ts.TypeElement) => {
+          if (ts.isPropertySignature(member) && member.type) {
+            visit(member.type);
+          }
+        });
+      }
+    };
+    
+    visit(typeAliasDecl.type);
     
     return Array.from(referenced);
   }
@@ -545,6 +815,11 @@ ${indent}}`;
     const usedGuardzTypeAliases = this.collectUsedGuardzTypeAliases(typeGuardCode);
     for (const type of usedGuardzTypeAliases) {
       typeImportsArr.push(`import type { ${type} } from 'guardz';`);
+    }
+    
+    // Add TypeGuardFn import if needed for generic type guards
+    if (this.needsTypeGuardFn(typeGuardCode)) {
+      typeImportsArr.push(`import type { TypeGuardFn } from 'guardz';`);
     }
     
     // Add imports for enums used in the generated code
@@ -696,6 +971,11 @@ ${indent}}`;
       }
     }
     return Array.from(usedAliases).sort();
+  }
+
+  // Check if TypeGuardFn is needed in the generated code
+  private needsTypeGuardFn(typeGuardCode: string): boolean {
+    return typeGuardCode.includes('TypeGuardFn<');
   }
 
   // Helper to get type name from a type node
