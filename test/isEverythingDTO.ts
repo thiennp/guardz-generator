@@ -7,6 +7,7 @@ import { isNullableTypes } from './dtos/isNullableTypes';
 import { isObjectTypes } from './dtos/isObjectTypes';
 import { isPrimitiveTypes } from './dtos/isPrimitiveTypes';
 import { isSpecialTypes } from './dtos/isSpecialTypes';
+
 export const isEverythingDTO = isType<EverythingDTO>({
   primitives: isPrimitiveTypes,
   nullable: isNullableTypes,

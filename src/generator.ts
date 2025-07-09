@@ -617,9 +617,9 @@ ${indent}}`;
   // Collect type guard functions used in the generated typeguard code
   private collectUsedTypeGuards(typeGuardCode: string): string[] {
     const usedTypeGuards = new Set<string>();
-    // Match type guard function calls (isXxx followed by parentheses or used as arguments)
-    // More specific pattern: match isXxx only when it's a function call or argument
-    const typeGuardPattern = /\bis([A-Z][a-zA-Z0-9_]*)\b(?=\s*\(|\s*,|\s*\))/g;
+    // Match type guard function calls (isXxx followed by parentheses, commas, closing braces, or used as arguments)
+    // More specific pattern: match isXxx when it's a function call, argument, or at end of object literal
+    const typeGuardPattern = /\bis([A-Z][a-zA-Z0-9_]*)\b(?=\s*\(|\s*,|\s*\)|\s*})/g;
     let match;
     const guardzUtilities = [
       'isString', 'isNumber', 'isBoolean', 'isDate', 'isArrayWithEachItem', 
