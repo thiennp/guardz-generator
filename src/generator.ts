@@ -324,16 +324,16 @@ export class TypeGuardGenerator {
         }
         const isOptional = member.questionToken !== undefined;
         if (isOptional) {
-          return `${indent}${name}: isUndefinedOr(${typeGuard})`;
+          return `${nextIndent}${name}: isUndefinedOr(${typeGuard})`;
         } else {
-          return `${indent}${name}: ${typeGuard}`;
+          return `${nextIndent}${name}: ${typeGuard}`;
         }
       }
       return '';
     }).filter(Boolean);
     const objectLiteral = `{
 ${properties.join(',\n')}
-${indent.slice(2)}}`;
+${indent}}`;
     return wrapInIsType ? `isType(${objectLiteral})` : objectLiteral;
   }
 

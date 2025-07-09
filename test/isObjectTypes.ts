@@ -3,11 +3,11 @@ import { isBoolean, isNumber, isObjectWithEachItem, isPartialOf, isString, isTyp
 export const isObjectTypes = isType<ObjectTypes>({
   obj: isObjectWithEachItem(isNumber),
   nonNullObj: isType({
-  foo: isString
-}),
+    foo: isString
+  }),
   partialObj: isPartialOf({
-  a: isString,
-  b: isNumber
-}),
+    a: isString,
+    b: isNumber
+  }),
   objWithEach: isObjectWithEachItem(isBoolean)
 });
