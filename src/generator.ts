@@ -99,7 +99,7 @@ export class TypeGuardGenerator {
   private generateTypeGuardCode(interfaceDecl: ts.InterfaceDeclaration, guardName: string): string {
     const properties = this.extractProperties(interfaceDecl);
     const propertyGuards = properties.map(prop => this.generatePropertyGuard(prop)).join(',\n  ');
-    return `const ${guardName} = isType<${interfaceDecl.name.text}>({\n  ${propertyGuards}\n});`;
+    return `export const ${guardName} = isType<${interfaceDecl.name.text}>({\n  ${propertyGuards}\n});`;
   }
 
   private extractProperties(interfaceDecl: ts.InterfaceDeclaration): Array<{
@@ -525,7 +525,7 @@ ${properties.join(',\n')}
     const allImports = [typeImports, enumImports, guardzImports, typeGuardImports].filter(Boolean);
     const importsSection = allImports.join('\n');
     
-    return `${importsSection}${importsSection ? '\n' : ''}${typeGuardCode}\n\nexport { ${guardName} };\n`;
+    return `${importsSection}${importsSection ? '\n' : ''}${typeGuardCode}\n`;
   }
 
   // Collect enums used in the generated typeguard code
