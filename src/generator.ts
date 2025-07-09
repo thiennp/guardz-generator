@@ -99,7 +99,49 @@ export class TypeGuardGenerator {
   private generateTypeGuardCode(interfaceDecl: ts.InterfaceDeclaration, guardName: string): string {
     const properties = this.extractProperties(interfaceDecl);
     const propertyGuards = properties.map(prop => this.generatePropertyGuard(prop)).join(',\n  ');
-    return `export const ${guardName} = isType<${interfaceDecl.name.text}>({\n  ${propertyGuards}\n});`;
+    
+    // Check if this interface is recursive (references itself)
+    const isRecursive = this.isRecursiveType(interfaceDecl);
+    
+    if (isRecursive) {
+      // For recursive types, use function declaration to avoid "used before defined" error
+      return `export function ${guardName}(value: unknown): value is ${interfaceDecl.name.text} {\n  return isType<${interfaceDecl.name.text}>({\n    ${propertyGuards}\n  })(value);\n}`;
+    } else {
+      // For non-recursive types, use const assignment
+      return `export const ${guardName} = isType<${interfaceDecl.name.text}>({\n  ${propertyGuards}\n});`;
+    }
+  }
+
+  // Check if an interface is recursive (references itself)
+  private isRecursiveType(interfaceDecl: ts.InterfaceDeclaration): boolean {
+    const interfaceName = interfaceDecl.name.text;
+    const guardName = `is${interfaceName}`;
+    
+    // Check if any property references the same interface
+    const properties = this.extractProperties(interfaceDecl);
+    for (const property of properties) {
+      if (this.typeReferencesInterface(property.type, interfaceName)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  // Check if a type node references the given interface name
+  private typeReferencesInterface(typeNode: ts.TypeNode, interfaceName: string): boolean {
+    if (ts.isTypeReferenceNode(typeNode)) {
+      const typeName = typeNode.typeName.getText();
+      return typeName === interfaceName;
+    } else if (ts.isArrayTypeNode(typeNode)) {
+      return this.typeReferencesInterface(typeNode.elementType, interfaceName);
+    } else if (ts.isUnionTypeNode(typeNode)) {
+      return typeNode.types.some(type => this.typeReferencesInterface(type, interfaceName));
+    } else if (ts.isParenthesizedTypeNode(typeNode)) {
+      return this.typeReferencesInterface(typeNode.type, interfaceName);
+    }
+    
+    return false;
   }
 
   private extractProperties(interfaceDecl: ts.InterfaceDeclaration): Array<{
