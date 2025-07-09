@@ -188,6 +188,7 @@ export class TypeGuardGenerator {
     } else {
       // Generic type alias
       const typeParameterNames = typeParameters.map(tp => tp.name);
+      const formattedTypeParameters = typeParameters.map(tp => this.formatTypeParameter(tp));
       const typeGuardParams = typeParameters.map(tp => `typeGuard${tp.name}: TypeGuardFn<${tp.name}>`);
       const genericTypeString = `${typeAliasDecl.name.text}<${typeParameterNames.join(', ')}>`;
       
@@ -195,11 +196,11 @@ export class TypeGuardGenerator {
         const properties = this.extractPropertiesFromTypeLiteral(typeAliasDecl.type);
         const propertyGuards = properties.map(prop => `    ${this.generatePropertyGuardForGeneric(prop, typeParameterNames)}`).join(',\n');
         
-        return `export const ${guardName} = <${typeParameterNames.join(', ')}>(${typeGuardParams.join(', ')}) => isType<${genericTypeString}>({\n${propertyGuards}\n});`;
+        return `export const ${guardName} = <${formattedTypeParameters.join(', ')}>(${typeGuardParams.join(', ')}) => isType<${genericTypeString}>({\n${propertyGuards}\n});`;
       } else {
         // Simple generic type alias
         const typeGuard = this.convertTypeToGuardForGeneric(typeAliasDecl.type, typeParameterNames);
-        return `export const ${guardName} = <${typeParameterNames.join(', ')}>(${typeGuardParams.join(', ')}) => ${typeGuard};`;
+        return `export const ${guardName} = <${formattedTypeParameters.join(', ')}>(${typeGuardParams.join(', ')}) => ${typeGuard};`;
       }
     }
   }
@@ -212,14 +213,15 @@ export class TypeGuardGenerator {
       return this.generateTypeGuardCode(interfaceDecl, guardName);
     } else {
       // Generic interface
-      const typeParameterNames = typeParameters.map((tp: { name: string; constraint?: ts.TypeNode }) => tp.name);
-      const typeGuardParams = typeParameters.map((tp: { name: string; constraint?: ts.TypeNode }) => `typeGuard${tp.name}: TypeGuardFn<${tp.name}>`);
+      const typeParameterNames = typeParameters.map((tp: { name: string; constraint?: ts.TypeNode; default?: ts.TypeNode }) => tp.name);
+      const formattedTypeParameters = typeParameters.map((tp: { name: string; constraint?: ts.TypeNode; default?: ts.TypeNode }) => this.formatTypeParameter(tp));
+      const typeGuardParams = typeParameters.map((tp: { name: string; constraint?: ts.TypeNode; default?: ts.TypeNode }) => `typeGuard${tp.name}: TypeGuardFn<${tp.name}>`);
       const genericTypeString = `${interfaceDecl.name.text}<${typeParameterNames.join(', ')}>`;
       
       const properties = this.extractProperties(interfaceDecl);
       const propertyGuards = properties.map(prop => `    ${this.generatePropertyGuardForGeneric(prop, typeParameterNames)}`).join(',\n');
       
-      return `export const ${guardName} = <${typeParameterNames.join(', ')}>(${typeGuardParams.join(', ')}) => isType<${genericTypeString}>({\n${propertyGuards}\n});`;
+      return `export const ${guardName} = <${formattedTypeParameters.join(', ')}>(${typeGuardParams.join(', ')}) => isType<${genericTypeString}>({\n${propertyGuards}\n});`;
     }
   }
 
@@ -304,17 +306,20 @@ export class TypeGuardGenerator {
   private extractTypeParameters(typeAliasDecl: ts.TypeAliasDeclaration): Array<{
     name: string;
     constraint?: ts.TypeNode;
+    default?: ts.TypeNode;
   }> {
     const typeParameters: Array<{
       name: string;
       constraint?: ts.TypeNode;
+      default?: ts.TypeNode;
     }> = [];
     
     if (typeAliasDecl.typeParameters) {
       typeAliasDecl.typeParameters.forEach((typeParam: ts.TypeParameterDeclaration) => {
         typeParameters.push({
           name: typeParam.name.text,
-          constraint: typeParam.constraint
+          constraint: typeParam.constraint,
+          default: typeParam.default
         });
       });
     }
@@ -325,22 +330,41 @@ export class TypeGuardGenerator {
   private extractTypeParametersFromInterface(interfaceDecl: ts.InterfaceDeclaration): Array<{
     name: string;
     constraint?: ts.TypeNode;
+    default?: ts.TypeNode;
   }> {
     const typeParameters: Array<{
       name: string;
       constraint?: ts.TypeNode;
+      default?: ts.TypeNode;
     }> = [];
     
     if (interfaceDecl.typeParameters) {
       interfaceDecl.typeParameters.forEach((typeParam: ts.TypeParameterDeclaration) => {
         typeParameters.push({
           name: typeParam.name.text,
-          constraint: typeParam.constraint
+          constraint: typeParam.constraint,
+          default: typeParam.default
         });
       });
     }
     
     return typeParameters;
+  }
+
+  private formatTypeParameter(typeParam: { name: string; constraint?: ts.TypeNode; default?: ts.TypeNode }): string {
+    let result = typeParam.name;
+    
+    if (typeParam.constraint) {
+      const constraintText = typeParam.constraint.getText();
+      result += ` extends ${constraintText}`;
+    }
+    
+    if (typeParam.default) {
+      const defaultText = typeParam.default.getText();
+      result += ` = ${defaultText}`;
+    }
+    
+    return result;
   }
 
   private generatePropertyGuard(property: {
