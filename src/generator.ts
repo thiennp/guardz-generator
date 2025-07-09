@@ -45,12 +45,12 @@ export class TypeGuardGenerator {
       const guardName = options.guardName || `is${interfaceDecl.name.text}`;
       const typeGuardCode = this.generateTypeGuardCode(interfaceDecl, guardName);
       const fileName = `${guardName}.ts`;
-      const sf = sourceFileOf(interfaceDecl);
-      const importTypes = this.collectReferencedTypes(interfaceDecl, sf);
-      const importPath = './' + path.basename(sf.fileName, '.ts');
+      // Place the generated file in the same directory as the interface definition
+      const outputDir = path.dirname(interfaceDecl.getSourceFile().fileName);
+      const importTypes = this.collectReferencedTypes(interfaceDecl);
       return {
-        fileName,
-        content: this.generateCompleteFile(guardName, typeGuardCode, interfaceDecl.name.text, importTypes, importPath),
+        fileName: path.join(outputDir, fileName),
+        content: this.generateCompleteFile(guardName, typeGuardCode, interfaceDecl.name.text, importTypes, fileName, outputDir),
         interfaceName: interfaceDecl.name.text
       };
     });
@@ -76,12 +76,13 @@ export class TypeGuardGenerator {
     if (!found) {
       throw new Error(`Interface '${interfaceName}' not found in source files`);
     }
-    const [targetInterface, targetSourceFile] = found;
+    const [targetInterface] = found;
     const guardName = options.guardName || `is${interfaceName}`;
     const typeGuardCode = this.generateTypeGuardCode(targetInterface, guardName);
-    const importTypes = this.collectReferencedTypes(targetInterface, targetSourceFile);
-    const importPath = './' + path.basename(targetSourceFile.fileName, '.ts');
-    return this.generateCompleteFile(guardName, typeGuardCode, interfaceName, importTypes, importPath);
+    const importTypes = this.collectReferencedTypes(targetInterface);
+    const outputDir = path.dirname(targetInterface.getSourceFile().fileName);
+    const fileName = `${guardName}.ts`;
+    return this.generateCompleteFile(guardName, typeGuardCode, interfaceName, importTypes, fileName, outputDir);
   }
 
   writeTypeGuardsToFiles(generatedFiles: GeneratedFile[], outputDir: string): void {
@@ -130,6 +131,7 @@ export class TypeGuardGenerator {
     isOptional: boolean;
   }): string {
     const typeGuard = this.convertTypeToGuard(property.type);
+    console.log(`Debug: Property ${property.name} generated guard: ${typeGuard}`);
     if (property.isOptional) {
       return `${property.name}: isUndefinedOr(${typeGuard})`;
     } else {
@@ -157,7 +159,6 @@ export class TypeGuardGenerator {
     const types = unionType.types;
     if (types.length === 2) {
       const typeText = unionType.getText();
-      
       if (typeText === 'string | null') {
         return 'isNullOr(isString)';
       }
@@ -174,7 +175,7 @@ export class TypeGuardGenerator {
         return 'isUndefinedOr(isDate)';
       }
     }
-    
+
     // Check if all types are literal types (string literals, numbers, etc.)
     const allLiterals = types.every((type: ts.TypeNode) => 
       ts.isLiteralTypeNode(type) && 
@@ -182,7 +183,7 @@ export class TypeGuardGenerator {
        type.literal.kind === ts.SyntaxKind.NumericLiteral ||
        type.literal.kind === ts.SyntaxKind.BooleanKeyword)
     );
-    
+
     if (allLiterals) {
       // For literal unions like 'a' | 'b' | 'c', use isOneOf with values
       const literalValues = types.map((type: ts.TypeNode) => {
@@ -193,57 +194,109 @@ export class TypeGuardGenerator {
       }).filter(Boolean);
       return `isOneOf(${literalValues.join(', ')})`;
     }
-    
+
     // For type unions like string | number | boolean, use isOneOfTypes
-    const typeGuards = types.map((type: ts.TypeNode) => this.convertTypeToGuard(type));
-    return `isOneOfTypes(${typeGuards.join(', ')})`;
+    // 1. Extract type names and their corresponding guard expressions
+    const typePairs = types.map((type: ts.TypeNode) => {
+      let typeName = '';
+      if (ts.isTypeReferenceNode(type)) {
+        typeName = type.typeName.getText();
+      } else if (ts.isLiteralTypeNode(type)) {
+        typeName = type.getText();
+      } else if (ts.isTypeLiteralNode(type)) {
+        typeName = type.getText();
+      } else {
+        typeName = type.getText();
+      }
+      return {
+        typeName,
+        guard: this.convertTypeToGuard(type)
+      };
+    });
+    // 2. Sort by typeName alphabetically
+    typePairs.sort((a, b) => a.typeName.localeCompare(b.typeName));
+    // 3. Build the generic type string and guard arguments
+    const genericType = typePairs.map(pair => pair.typeName).join(' | ');
+    const guardArgs = typePairs.map(pair => pair.guard).join(', ');
+    return `isOneOfTypes<${genericType}>(${guardArgs})`;
   }
 
   private handleTypeReference(typeRef: ts.TypeReferenceNode): string {
     const typeName = typeRef.typeName.getText();
+    console.log(`Debug: Handling type reference: ${typeName}`);
     
     switch (typeName) {
-      case 'string':
+      case 'string': {
         return 'isString';
-      case 'number':
+      }
+      case 'number': {
         return 'isNumber';
-      case 'boolean':
+      }
+      case 'boolean': {
         return 'isBoolean';
-      case 'Date':
+      }
+      case 'Date': {
         return 'isDate';
+      }
       case 'Array':
-      case 'array':
+      case 'array': {
         if (typeRef.typeArguments && typeRef.typeArguments.length > 0) {
           const elementType = this.convertTypeToGuard(typeRef.typeArguments[0]);
           return `isArrayWithEachItem(${elementType})`;
         }
         return 'isArrayWithEachItem(isUnknown)';
-      case 'Nullable':
+      }
+      case 'Nullable': {
         if (typeRef.typeArguments && typeRef.typeArguments.length > 0) {
           const innerType = this.convertTypeToGuard(typeRef.typeArguments[0]);
           return `isNullOr(${innerType})`;
         }
         return 'isNullOr(isUnknown)';
-      case 'Record':
+      }
+      case 'Record': {
         if (typeRef.typeArguments && typeRef.typeArguments.length >= 2) {
-          const keyType = this.convertTypeToGuard(typeRef.typeArguments[0]);
           const valueType = this.convertTypeToGuard(typeRef.typeArguments[1]);
           return `isObjectWithEachItem(${valueType})`;
         }
         return 'isObjectWithEachItem(isUnknown)';
-      case 'NonEmptyString':
+      }
+      case 'NonEmptyString': {
         return 'isNonEmptyString';
-      case 'NonNegativeNumber':
+      }
+      case 'NonNegativeNumber': {
         return 'isNonNegativeNumber';
-      case 'PositiveNumber':
+      }
+      case 'PositiveNumber': {
         return 'isPositiveNumber';
-      case 'NonEmptyArray':
+      }
+      case 'NonEmptyArray': {
         if (typeRef.typeArguments && typeRef.typeArguments.length > 0) {
           const elementType = this.convertTypeToGuard(typeRef.typeArguments[0]);
           return `isNonEmptyArrayWithEachItem(${elementType})`;
         }
         return 'isNonEmptyArrayWithEachItem(isUnknown)';
-      default:
+      }
+      case 'Partial': {
+        console.log(`Debug: Processing Partial with ${typeRef.typeArguments?.length || 0} type arguments`);
+        if (typeRef.typeArguments && typeRef.typeArguments.length > 0) {
+          const arg = typeRef.typeArguments[0];
+          console.log(`Debug: Partial argument type: ${arg.getText()}`);
+          let innerTypeGuard;
+          if (ts.isTypeLiteralNode(arg)) {
+            // Inline object type: generate just the object literal, not isType({ ... })
+            console.log(`Debug: Partial argument is TypeLiteral`);
+            innerTypeGuard = this.handleTypeLiteral(arg, /*wrapInIsType*/ false);
+          } else {
+            console.log(`Debug: Partial argument is not TypeLiteral`);
+            innerTypeGuard = this.convertTypeToGuard(arg);
+          }
+          console.log(`Debug: Generated innerTypeGuard: ${innerTypeGuard}`);
+          return `isPartialOf(${innerTypeGuard})`;
+        }
+        console.log(`Debug: Partial has no type arguments`);
+        return 'isPartialOf(isUnknown)';
+      }
+      default: {
         const isEnum = this.isEnumType(typeName);
         if (isEnum) {
           return `isEnum(${typeName})`;
@@ -253,10 +306,11 @@ export class TypeGuardGenerator {
           return `is${typeName}`;
         }
         return `isType<${typeName}>({})`;
+      }
     }
   }
 
-  private handleTypeLiteral(typeLiteral: ts.TypeLiteralNode): string {
+  private handleTypeLiteral(typeLiteral: ts.TypeLiteralNode, wrapInIsType: boolean = true): string {
     const properties = typeLiteral.members.map((member: ts.TypeElement) => {
       if (ts.isPropertySignature(member) && member.name && member.type) {
         const name = member.name.getText();
@@ -270,7 +324,10 @@ export class TypeGuardGenerator {
       }
       return '';
     }).filter(Boolean);
-    return `isType({\n${properties.join(',\n')}\n})`;
+    const objectLiteral = `{
+${properties.join(',\n')}
+}`;
+    return wrapInIsType ? `isType(${objectLiteral})` : objectLiteral;
   }
 
   private handleArrayType(arrayType: ts.ArrayTypeNode): string {
@@ -307,8 +364,10 @@ export class TypeGuardGenerator {
         return 'isEqualTo(null)';
       case 'undefined':
         return 'isEqualTo(undefined)';
-      default:
+      default: {
+        // wrap in block to fix no-case-declarations
         return 'isUnknown';
+      }
     }
   }
 
@@ -339,7 +398,7 @@ export class TypeGuardGenerator {
   }
 
   // Collect all referenced types/interfaces/enums for import
-  private collectReferencedTypes(interfaceDecl: ts.InterfaceDeclaration, sourceFile: ts.SourceFile): string[] {
+  private collectReferencedTypes(interfaceDecl: ts.InterfaceDeclaration): string[] {
     const referenced = new Set<string>();
     referenced.add(interfaceDecl.name.text);
     
@@ -382,7 +441,7 @@ export class TypeGuardGenerator {
     const builtInTypes = [
       'string', 'number', 'boolean', 'any', 'unknown', 'null', 'undefined',
       'Date', 'Array', 'Promise', 'Map', 'Set', 'RegExp', 'Error',
-      'Object', 'Function', 'Symbol', 'BigInt'
+      'Object', 'Function', 'Symbol', 'BigInt', 'Partial'
     ];
     return builtInTypes.includes(typeName);
   }
@@ -400,10 +459,14 @@ export class TypeGuardGenerator {
     typeGuardCode: string,
     interfaceName: string,
     importTypes: string[],
-    importPath: string
+    fileName: string,
+    outputDir: string
   ): string {
     // Collect enums used in this interface
-    const usedEnums = this.collectUsedEnums(interfaceName, importPath);
+    const usedEnums = this.collectUsedEnums(interfaceName);
+    
+    // Collect enums used in the generated type guard code
+    const usedEnumsInCode = this.collectUsedEnumsInCode(typeGuardCode);
     
     // Collect guardz utilities used in the generated code
     const usedGuardzUtilities = this.collectUsedGuardzUtilities(typeGuardCode);
@@ -413,15 +476,52 @@ export class TypeGuardGenerator {
 
     // Only import types that are actually referenced in the generated code
     const usedTypes = importTypes.filter(type => new RegExp(`\\b${type}\\b`).test(typeGuardCode));
-    const typeImports = usedTypes.length > 0 ? `import type { ${usedTypes.join(', ')} } from '${importPath}';` : '';
-    const enumImports = usedEnums.length > 0 ? `import { ${usedEnums.join(', ')} } from '${importPath}';` : '';
-    const guardzImports = usedGuardzUtilities.length > 0 ? `import { ${usedGuardzUtilities.join(', ')} } from 'guardz';` : '';
+    // For each used type, resolve its source file and compute the relative import path
+    const typeImportsArr: string[] = [];
+    const enumImportsArr: string[] = [];
+    for (const type of usedTypes) {
+      const typeSourceFile = findTypeSourceFile(type, this.sourceFiles);
+      if (typeSourceFile) {
+        const relPath = './' + path.relative(outputDir, typeSourceFile).replace(/\\/g, '/').replace(/\.ts$/, '');
+        // Check if it's an enum
+        if (this.isEnumType(type)) {
+          enumImportsArr.push(`import { ${type} } from '${relPath}';`);
+        } else {
+          typeImportsArr.push(`import type { ${type} } from '${relPath}';`);
+        }
+      }
+    }
     
+    // Add imports for enums used in the generated code
+    for (const enumName of usedEnumsInCode) {
+      const enumSourceFile = findTypeSourceFile(enumName, this.sourceFiles);
+      if (enumSourceFile) {
+        const relPath = './' + path.relative(outputDir, enumSourceFile).replace(/\\/g, '/').replace(/\.ts$/, '');
+        enumImportsArr.push(`import { ${enumName} } from '${relPath}';`);
+      }
+    }
+    const typeImports = typeImportsArr.join('\n');
+    const enumImports = enumImportsArr.join('\n');
+    const guardzImports = usedGuardzUtilities.length > 0 ? `import { ${usedGuardzUtilities.join(', ')} } from 'guardz';` : '';
     // Filter out the current type guard to avoid circular imports
     const filteredTypeGuards = usedTypeGuards.filter(name => name !== guardName && new RegExp(`\\b${name}\\b`).test(typeGuardCode));
-    // Import type guards from their individual files
-    const typeGuardImports = filteredTypeGuards.map(name => `import { ${name} } from './${name}';`).join('\n');
-    
+    console.log(`Debug: Found type guards for ${guardName}:`, filteredTypeGuards);
+    // Import type guards from their individual files (relative to outputDir)
+    const typeGuardImports = filteredTypeGuards.map(name => {
+      // Find the actual source file for this type guard
+      const typeGuardSourceFile = this.findTypeGuardSourceFile(name);
+      console.log(`Debug: Type guard ${name} source file:`, typeGuardSourceFile);
+      if (typeGuardSourceFile) {
+        const relPath = './' + path.relative(outputDir, typeGuardSourceFile).replace(/\\/g, '/').replace(/\.ts$/, '');
+        console.log(`Debug: Import path for ${name}:`, relPath);
+        return `import { ${name} } from '${relPath}';`;
+      }
+      // Fallback to same directory if not found
+      const guardFile = `${name}.ts`;
+      const relPath = './' + path.relative(outputDir, path.join(outputDir, guardFile)).replace(/\\/g, '/').replace(/\.ts$/, '');
+      console.log(`Debug: Fallback import path for ${name}:`, relPath);
+      return `import { ${name} } from '${relPath}';`;
+    }).join('\n');
     const allImports = [typeImports, enumImports, guardzImports, typeGuardImports].filter(Boolean);
     const importsSection = allImports.join('\n');
     
@@ -429,7 +529,7 @@ export class TypeGuardGenerator {
   }
 
   // Collect enums used in the generated typeguard code
-  private collectUsedEnums(interfaceName: string, importPath: string): string[] {
+  private collectUsedEnums(interfaceName: string): string[] {
     const usedEnums = new Set<string>();
     
     // Find the interface and check its properties for enum usage
@@ -446,6 +546,20 @@ export class TypeGuardGenerator {
           });
         }
       });
+    }
+    
+    return Array.from(usedEnums);
+  }
+
+  // Collect enums used in the generated type guard code
+  private collectUsedEnumsInCode(typeGuardCode: string): string[] {
+    const usedEnums = new Set<string>();
+    
+    // Look for enum usage patterns like isEnum(EnumName)
+    const enumPattern = /isEnum\(([A-Z][a-zA-Z0-9_]*)\)/g;
+    let match;
+    while ((match = enumPattern.exec(typeGuardCode)) !== null) {
+      usedEnums.add(match[1]);
     }
     
     return Array.from(usedEnums);
@@ -477,7 +591,8 @@ export class TypeGuardGenerator {
       { pattern: 'isNonEmptyString', utility: 'isNonEmptyString' },
       { pattern: 'isNonNegativeNumber', utility: 'isNonNegativeNumber' },
       { pattern: 'isPositiveNumber', utility: 'isPositiveNumber' },
-      { pattern: 'isNonEmptyArrayWithEachItem', utility: 'isNonEmptyArrayWithEachItem' }
+      { pattern: 'isNonEmptyArrayWithEachItem', utility: 'isNonEmptyArrayWithEachItem' },
+      { pattern: 'isPartialOf', utility: 'isPartialOf' }
     ];
     
     for (const check of utilityChecks) {
@@ -492,14 +607,14 @@ export class TypeGuardGenerator {
   // Collect type guard functions used in the generated typeguard code
   private collectUsedTypeGuards(typeGuardCode: string): string[] {
     const usedTypeGuards = new Set<string>();
-    // Match type guard function calls and property values (isXxx followed by parentheses, commas, or used as values)
-    const typeGuardPattern = /\bis([A-Z][a-zA-Z0-9_]*)\b(?=\s*[,(]|\s*$|\s*:)/g;
+    // Match type guard function calls and property values (isXxx followed by parentheses, commas, end of line, or used as values)
+    const typeGuardPattern = /\bis([A-Z][a-zA-Z0-9_]*)\b(?=\s*[,(]|\s*$|\s*:|\s*})/g;
     let match;
     const guardzUtilities = [
       'isString', 'isNumber', 'isBoolean', 'isDate', 'isArrayWithEachItem', 
       'isObjectWithEachItem', 'isUndefinedOr', 'isNullOr', 'isOneOf', 'isOneOfTypes',
       'isEqualTo', 'isAny', 'isUnknown', 'isEnum', 'isNonEmptyString', 
-      'isNonNegativeNumber', 'isPositiveNumber', 'isNonEmptyArrayWithEachItem', 'isType'
+      'isNonNegativeNumber', 'isPositiveNumber', 'isNonEmptyArrayWithEachItem', 'isType', 'isPartialOf'
     ];
     while ((match = typeGuardPattern.exec(typeGuardCode)) !== null) {
       const typeGuardName = match[0];
@@ -517,16 +632,41 @@ export class TypeGuardGenerator {
     }
     return null;
   }
-}
 
-// Helper to get the source file of a node
-function sourceFileOf(node: ts.Node): ts.SourceFile {
-  let current: ts.Node = node;
-  while (current.parent) {
-    current = current.parent;
+  // Helper to find the source file for a type guard function
+  private findTypeGuardSourceFile(typeGuardName: string): string | undefined {
+    // Remove 'is' prefix to get the interface name
+    const interfaceName = typeGuardName.replace(/^is/, '');
+    for (const sf of this.sourceFiles) {
+      let found = false;
+      ts.forEachChild(sf, (node: ts.Node) => {
+        if (ts.isInterfaceDeclaration(node) && node.name.text === interfaceName) {
+          found = true;
+        }
+      });
+      if (found) {
+        // The generated type guard will be in the same directory as the interface
+        const dir = path.dirname(sf.fileName);
+        return path.join(dir, `${typeGuardName}.ts`);
+      }
+    }
+    return undefined;
   }
-  if (ts.isSourceFile(current)) {
-    return current;
+} 
+
+// Helper to find the source file path for a given type name
+function findTypeSourceFile(typeName: string, sourceFiles: ts.SourceFile[]): string | undefined {
+  for (const sf of sourceFiles) {
+    let found = false;
+    ts.forEachChild(sf, (node: ts.Node) => {
+      if (
+        (ts.isInterfaceDeclaration(node) || ts.isEnumDeclaration(node) || ts.isTypeAliasDeclaration(node)) &&
+        node.name && node.name.text === typeName
+      ) {
+        found = true;
+      }
+    });
+    if (found) return sf.fileName;
   }
-  throw new Error('Could not find source file for node');
+  return undefined;
 } 
