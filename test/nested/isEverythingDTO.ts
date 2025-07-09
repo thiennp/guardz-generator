@@ -1,5 +1,5 @@
 import type { EverythingDTO } from './../dtos/EverythingDTO';
-import { isEnum, isType } from 'guardz';
+import { isType } from 'guardz';
 import { isArrayTypes } from './../dtos/isArrayTypes';
 import { isEnumTypes } from './../dtos/isEnumTypes';
 import { isLevel1 } from './../dtos/isLevel1';
