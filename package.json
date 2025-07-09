@@ -16,7 +16,8 @@
     "lint:fix": "eslint src/ --ext .ts --fix",
     "type-check": "tsc --noEmit",
     "verify": "npm run type-check && npm run lint",
-    "verify:generated": "npm run type-check && npm run lint && tsc --noEmit test/**/*.ts"
+    "verify:generated": "npm run type-check && npm run lint && tsc --noEmit test/**/*.ts",
+    "guardz-generator": "node dist/cli.js"
   },
   "repository": {
     "type": "git",

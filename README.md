@@ -12,6 +12,42 @@ pnpm add guardz-generator
 
 ## Usage
 
+### NPM Script (Recommended)
+
+Add the script to your `package.json`:
+
+```json
+{
+  "scripts": {
+    "guardz-generator": "node dist/cli.js"
+  }
+}
+```
+
+Then use it to generate type guards:
+
+#### Generate guards for all interfaces in files
+
+```bash
+npm run guardz-generator -- "src/**/*.ts" --all
+npm run guardz-generator -- "models/*.ts" --all
+npm run guardz-generator -- "types/**/*.ts" --all
+```
+
+#### Generate guard for a specific interface
+
+```bash
+npm run guardz-generator -- "src/types.ts" --interface HintDTO
+```
+
+#### Generate guard with custom name
+
+```bash
+npm run guardz-generator -- "src/types.ts" --interface HintDTO --guard-name validateHint
+```
+
+**Note:** The double dash (`--`) is required when passing arguments to npm scripts to ensure they are passed correctly to the underlying command.
+
 ### Command Line Interface
 
 #### Generate guards for all interfaces in a file
