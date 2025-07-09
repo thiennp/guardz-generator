@@ -483,6 +483,11 @@ ${indent}}`;
 
     // Only import types that are actually referenced in the generated code
     const usedTypes = importTypes.filter(type => new RegExp(`\\b${type}\\b`).test(typeGuardCode));
+    
+    // Also collect guardz type aliases that appear in the generated code
+    const guardzTypeAliases = ['NonEmptyString', 'NonNegativeNumber', 'PositiveNumber', 'NonEmptyArray', 'Nullable'];
+    const usedGuardzTypes = guardzTypeAliases.filter(type => new RegExp(`\\b${type}\\b`).test(typeGuardCode));
+    
     // For each used type, resolve its source file and compute the relative import path
     const typeImportsArr: string[] = [];
     const enumImportsArr: string[] = [];
@@ -497,6 +502,12 @@ ${indent}}`;
           typeImportsArr.push(`import type { ${type} } from '${relPath}';`);
         }
       }
+    }
+    
+    // Add imports for guardz type aliases used in the generated code
+    const usedGuardzTypeAliases = this.collectUsedGuardzTypeAliases(typeGuardCode);
+    for (const type of usedGuardzTypeAliases) {
+      typeImportsArr.push(`import type { ${type} } from 'guardz';`);
     }
     
     // Add imports for enums used in the generated code
@@ -615,7 +626,8 @@ ${indent}}`;
   private collectUsedTypeGuards(typeGuardCode: string): string[] {
     const usedTypeGuards = new Set<string>();
     // Match type guard function calls and property values (isXxx followed by parentheses, commas, end of line, or used as values)
-    const typeGuardPattern = /\bis([A-Z][a-zA-Z0-9_]*)\b(?=\s*[,(]|\s*$|\s*:|\s*})/g;
+    // Improved regex: match isXxx as function call, argument, or property value
+    const typeGuardPattern = /\bis([A-Z][a-zA-Z0-9_]*)\b(?=\s*[,(]|\s*\)|\s*$|\s*:|\s*}|\s*\[)/g;
     let match;
     const guardzUtilities = [
       'isString', 'isNumber', 'isBoolean', 'isDate', 'isArrayWithEachItem', 
@@ -630,6 +642,23 @@ ${indent}}`;
       }
     }
     return Array.from(usedTypeGuards).sort();
+  }
+
+  // Collect guardz type aliases used in the generated typeguard code
+  private collectUsedGuardzTypeAliases(typeGuardCode: string): string[] {
+    // These are the guardz type aliases that should be imported if used
+    const guardzTypeAliases = [
+      'NonEmptyArray', 'NonEmptyString', 'NonNegativeNumber', 'PositiveNumber', 'Nullable'
+    ];
+    const usedAliases = new Set<string>();
+    // Look for usages like NonEmptyArray<, NonEmptyString<, etc.
+    for (const alias of guardzTypeAliases) {
+      const pattern = new RegExp(`\\b${alias}\\b`, 'g');
+      if (pattern.test(typeGuardCode)) {
+        usedAliases.add(alias);
+      }
+    }
+    return Array.from(usedAliases).sort();
   }
 
   // Helper to get type name from a type node
