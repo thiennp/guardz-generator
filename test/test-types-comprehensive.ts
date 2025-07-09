@@ -86,4 +86,4 @@ export interface EverythingDTO {
   enums: EnumTypes;
   specials: SpecialTypes;
   nested: Level1;
-} 
+}

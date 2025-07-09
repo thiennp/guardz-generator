@@ -1,6 +1,6 @@
 {
   "name": "guardz-generator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Generate TypeScript type guards using guardz library",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -56,9 +56,6 @@
   },
   "files": [
     "dist"
-  ],
-  "peerDependencies": {
-    "guardz": "^1.0.0"
-  }
+  ]
 }
  

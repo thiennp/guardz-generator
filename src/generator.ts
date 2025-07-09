@@ -48,14 +48,19 @@ export class TypeGuardGenerator {
     
     const interfaceFiles = interfaces.map(interfaceDecl => {
       const guardName = options.guardName || `is${interfaceDecl.name.text}`;
-      const typeGuardCode = this.generateTypeGuardCode(interfaceDecl, guardName);
+      // Check if interface has generic parameters
+      const hasGenerics = interfaceDecl.typeParameters && interfaceDecl.typeParameters.length > 0;
+      const typeGuardCode = hasGenerics 
+        ? this.generateGenericTypeGuardCodeForInterface(interfaceDecl, guardName)
+        : this.generateTypeGuardCode(interfaceDecl, guardName);
       const fileName = `${guardName}.ts`;
       // Place the generated file in the same directory as the interface definition
       const outputDir = path.dirname(interfaceDecl.getSourceFile().fileName);
       const importTypes = this.collectReferencedTypes(interfaceDecl);
+      const needsTypeGuardFnImport = hasGenerics;
       return {
         fileName: path.join(outputDir, fileName),
-        content: this.generateCompleteFile(guardName, typeGuardCode, interfaceDecl.name.text, importTypes, fileName, outputDir),
+        content: this.generateCompleteFile(guardName, typeGuardCode, interfaceDecl.name.text, importTypes, fileName, outputDir, needsTypeGuardFnImport),
         interfaceName: interfaceDecl.name.text
       };
     });
@@ -67,9 +72,10 @@ export class TypeGuardGenerator {
       // Place the generated file in the same directory as the type alias definition
       const outputDir = path.dirname(typeAliasDecl.getSourceFile().fileName);
       const importTypes = this.collectReferencedTypesFromTypeAlias(typeAliasDecl);
+      const needsTypeGuardFnImport = this.needsTypeGuardFn(typeGuardCode);
       return {
         fileName: path.join(outputDir, fileName),
-        content: this.generateCompleteFile(guardName, typeGuardCode, typeAliasDecl.name.text, importTypes, fileName, outputDir),
+        content: this.generateCompleteFile(guardName, typeGuardCode, typeAliasDecl.name.text, importTypes, fileName, outputDir, needsTypeGuardFnImport),
         interfaceName: typeAliasDecl.name.text
       };
     });
@@ -198,6 +204,25 @@ export class TypeGuardGenerator {
     }
   }
 
+  private generateGenericTypeGuardCodeForInterface(interfaceDecl: ts.InterfaceDeclaration, guardName: string): string {
+    const typeParameters = this.extractTypeParametersFromInterface(interfaceDecl);
+    
+    if (typeParameters.length === 0) {
+      // Non-generic interface, use regular generation
+      return this.generateTypeGuardCode(interfaceDecl, guardName);
+    } else {
+      // Generic interface
+      const typeParameterNames = typeParameters.map((tp: { name: string; constraint?: ts.TypeNode }) => tp.name);
+      const typeGuardParams = typeParameters.map((tp: { name: string; constraint?: ts.TypeNode }) => `typeGuard${tp.name}: TypeGuardFn<${tp.name}>`);
+      const genericTypeString = `${interfaceDecl.name.text}<${typeParameterNames.join(', ')}>`;
+      
+      const properties = this.extractProperties(interfaceDecl);
+      const propertyGuards = properties.map(prop => `    ${this.generatePropertyGuardForGeneric(prop, typeParameterNames)}`).join(',\n');
+      
+      return `export const ${guardName} = <${typeParameterNames.join(', ')}>(${typeGuardParams.join(', ')}) => isType<${genericTypeString}>({\n${propertyGuards}\n});`;
+    }
+  }
+
   // Check if an interface is recursive (references itself)
   private isRecursiveType(interfaceDecl: ts.InterfaceDeclaration): boolean {
     const interfaceName = interfaceDecl.name.text;
@@ -287,6 +312,27 @@ export class TypeGuardGenerator {
     
     if (typeAliasDecl.typeParameters) {
       typeAliasDecl.typeParameters.forEach((typeParam: ts.TypeParameterDeclaration) => {
+        typeParameters.push({
+          name: typeParam.name.text,
+          constraint: typeParam.constraint
+        });
+      });
+    }
+    
+    return typeParameters;
+  }
+
+  private extractTypeParametersFromInterface(interfaceDecl: ts.InterfaceDeclaration): Array<{
+    name: string;
+    constraint?: ts.TypeNode;
+  }> {
+    const typeParameters: Array<{
+      name: string;
+      constraint?: ts.TypeNode;
+    }> = [];
+    
+    if (interfaceDecl.typeParameters) {
+      interfaceDecl.typeParameters.forEach((typeParam: ts.TypeParameterDeclaration) => {
         typeParameters.push({
           name: typeParam.name.text,
           constraint: typeParam.constraint
@@ -774,7 +820,8 @@ ${indent}}`;
     interfaceName: string,
     importTypes: string[],
     fileName: string,
-    outputDir: string
+    outputDir: string,
+    needsTypeGuardFnImport?: boolean
   ): string {
     // Collect enums used in this interface
     const usedEnums = this.collectUsedEnums(interfaceName);
@@ -818,7 +865,7 @@ ${indent}}`;
     }
     
     // Add TypeGuardFn import if needed for generic type guards
-    if (this.needsTypeGuardFn(typeGuardCode)) {
+    if (needsTypeGuardFnImport || this.needsTypeGuardFn(typeGuardCode)) {
       typeImportsArr.push(`import type { TypeGuardFn } from 'guardz';`);
     }
     

@@ -1,4 +1,4 @@
-import type { A } from './test-generic';
+import type { A } from './test-generic-interface';
 import type { TypeGuardFn } from 'guardz';
 import { isType } from 'guardz';
 
