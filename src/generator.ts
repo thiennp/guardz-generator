@@ -98,10 +98,13 @@ export class TypeGuardGenerator {
 
   private generateTypeGuardCode(interfaceDecl: ts.InterfaceDeclaration, guardName: string): string {
     const properties = this.extractProperties(interfaceDecl);
-    const propertyGuards = properties.map(prop => `  ${this.generatePropertyGuard(prop)}`).join(',\n');
     
     // Check if this interface is recursive (references itself)
     const isRecursive = this.isRecursiveType(interfaceDecl);
+    
+    // Use different indentation based on whether it's recursive or not
+    const indent = isRecursive ? '    ' : '  '; // 4 spaces for recursive, 2 for non-recursive
+    const propertyGuards = properties.map(prop => `${indent}${this.generatePropertyGuard(prop)}`).join(',\n');
     
     if (isRecursive) {
       // For recursive types, use function declaration to avoid "used before defined" error
