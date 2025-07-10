@@ -38,9 +38,9 @@ export class TypeGuardGenerator {
     
     for (const sourceFile of this.sourceFiles) {
       ts.forEachChild(sourceFile, (node: ts.Node) => {
-        if (ts.isInterfaceDeclaration(node)) {
+        if (ts.isInterfaceDeclaration(node) && this.isExported(node)) {
           interfaces.push(node);
-        } else if (ts.isTypeAliasDeclaration(node)) {
+        } else if (ts.isTypeAliasDeclaration(node) && this.isExported(node)) {
           typeAliases.push(node);
         }
       });
@@ -87,7 +87,7 @@ export class TypeGuardGenerator {
     for (const sourceFile of this.sourceFiles) {
       let found: ts.InterfaceDeclaration | null = null;
       ts.forEachChild(sourceFile, (node: ts.Node) => {
-        if (ts.isInterfaceDeclaration(node) && node.name.text === interfaceName && !found) {
+        if (ts.isInterfaceDeclaration(node) && node.name.text === interfaceName && this.isExported(node) && !found) {
           found = node;
         }
       });
@@ -102,7 +102,7 @@ export class TypeGuardGenerator {
     for (const sourceFile of this.sourceFiles) {
       let found: ts.TypeAliasDeclaration | null = null;
       ts.forEachChild(sourceFile, (node: ts.Node) => {
-        if (ts.isTypeAliasDeclaration(node) && node.name.text === typeName && !found) {
+        if (ts.isTypeAliasDeclaration(node) && node.name.text === typeName && this.isExported(node) && !found) {
           found = node;
         }
       });
@@ -1063,6 +1063,12 @@ ${indent}}`;
   // Check if TypeGuardFn is needed in the generated code
   private needsTypeGuardFn(typeGuardCode: string): boolean {
     return typeGuardCode.includes('TypeGuardFn<');
+  }
+
+  // Check if a declaration is exported
+  private isExported(node: ts.InterfaceDeclaration | ts.TypeAliasDeclaration): boolean {
+    // Check if the node has export modifier
+    return node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword) ?? false;
   }
 
   // Helper to get type name from a type node
