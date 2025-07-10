@@ -1,3 +1,3 @@
-import { isString, isType } from 'guardz';
+import { isString } from "guardz";
 
 export const isSimpleAlias = isString;

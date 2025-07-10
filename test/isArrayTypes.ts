@@ -1,8 +1,14 @@
-import type { ArrayTypes } from './test-types-comprehensive';
-import { isArrayWithEachItem, isNullOr, isNumber, isString, isType } from 'guardz';
+import type { ArrayTypes } from "./test-types-comprehensive";
+import {
+  isArrayWithEachItem,
+  isNullOr,
+  isNumber,
+  isString,
+  isType,
+} from "guardz";
 
 export const isArrayTypes = isType<ArrayTypes>({
   arr: isArrayWithEachItem(isString),
   arrOfArr: isArrayWithEachItem(isArrayWithEachItem(isNumber)),
-  arrOfNullable: isArrayWithEachItem(isNullOr(isString))
+  arrOfNullable: isArrayWithEachItem(isNullOr(isString)),
 });

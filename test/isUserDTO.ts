@@ -1,5 +1,15 @@
-import type { UserDTO } from './test-types';
-import { isArrayWithEachItem, isBoolean, isDate, isNumber, isObjectWithEachItem, isString, isType, isUndefinedOr, isUnknown } from 'guardz';
+import type { UserDTO } from "./test-types";
+import {
+  isArrayWithEachItem,
+  isBoolean,
+  isDate,
+  isNumber,
+  isObjectWithEachItem,
+  isString,
+  isType,
+  isUndefinedOr,
+  isUnknown,
+} from "guardz";
 
 export const isUserDTO = isType<UserDTO>({
   id: isNumber,
@@ -8,5 +18,5 @@ export const isUserDTO = isType<UserDTO>({
   isActive: isBoolean,
   createdAt: isDate,
   tags: isArrayWithEachItem(isString),
-  metadata: isUndefinedOr(isObjectWithEachItem(isUnknown))
+  metadata: isUndefinedOr(isObjectWithEachItem(isUnknown)),
 });

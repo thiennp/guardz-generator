@@ -1,8 +1,23 @@
-import type { ComplexUser } from './complex-test';
-import { TestStatus } from './complex-test';
-import { Priority } from './complex-test';
-import { isAny, isBoolean, isDate, isEnum, isEqualTo, isNonEmptyArrayWithEachItem, isNonEmptyString, isNonNegativeNumber, isNullOr, isOneOf, isPositiveNumber, isType, isUndefinedOr, isUnknown } from 'guardz';
-import { isUserProfile } from './isUserProfile';
+import type { ComplexUser } from "./complex-test";
+import { TestStatus } from "./complex-test";
+import { Priority } from "./complex-test";
+import {
+  isAny,
+  isBoolean,
+  isDate,
+  isEnum,
+  isEqualTo,
+  isNonEmptyArrayWithEachItem,
+  isNonEmptyString,
+  isNonNegativeNumber,
+  isNullOr,
+  isOneOf,
+  isPositiveNumber,
+  isType,
+  isUndefinedOr,
+  isUnknown,
+} from "guardz";
+import { isUserProfile } from "./isUserProfile";
 
 export const isComplexUser = isType<ComplexUser>({
   id: isNonEmptyString,
@@ -16,28 +31,28 @@ export const isComplexUser = isType<ComplexUser>({
     created: isDate,
     lastLogin: isDate,
     loginCount: isNonNegativeNumber,
-    isVerified: isBoolean
+    isVerified: isBoolean,
   }),
   settings: isType({
     notifications: isType({
       email: isBoolean,
       push: isBoolean,
-      sms: isBoolean
+      sms: isBoolean,
     }),
     privacy: isType({
       publicProfile: isBoolean,
       showEmail: isBoolean,
-      allowMessages: isBoolean
-    })
+      allowMessages: isBoolean,
+    }),
   }),
   optionalProfile: isUndefinedOr(isUserProfile),
   nullableProfile: isNullOr(isUserProfile),
   anyData: isAny,
   unknownData: isUnknown,
-  literalValue: isOneOf('specific', 'exact', 'value'),
+  literalValue: isOneOf("specific", "exact", "value"),
   numberLiteral: isEqualTo(42),
   booleanLiteral: isEqualTo(true),
-  stringLiteral: isEqualTo('hello'),
+  stringLiteral: isEqualTo("hello"),
   nullValue: isEqualTo(null),
-  undefinedValue: isEqualTo(undefined)
+  undefinedValue: isEqualTo(undefined),
 });

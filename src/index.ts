@@ -1,1 +1,5 @@
-export { TypeGuardGenerator, type TypeGuardOptions, type GeneratedFile } from './generator'; 
+export {
+  TypeGuardGenerator,
+  type TypeGuardOptions,
+  type GeneratedFile,
+} from './generator';

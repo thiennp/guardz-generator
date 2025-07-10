@@ -1,9 +1,11 @@
-import type { OptionalRecursive } from './recursive-test';
-import { isNumber, isType, isUndefinedOr } from 'guardz';
+import type { OptionalRecursive } from "./recursive-test";
+import { isNumber, isType, isUndefinedOr } from "guardz";
 
-export function isOptionalRecursive(value: unknown): value is OptionalRecursive {
+export function isOptionalRecursive(
+  value: unknown,
+): value is OptionalRecursive {
   return isType<OptionalRecursive>({
     id: isNumber,
-    parent: isUndefinedOr(isOptionalRecursive)
+    parent: isUndefinedOr(isOptionalRecursive),
   })(value);
 }

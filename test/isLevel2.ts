@@ -1,8 +1,8 @@
-import type { Level2 } from './test-types-comprehensive';
-import { isArrayWithEachItem, isType } from 'guardz';
-import { isLevel3 } from './isLevel3';
+import type { Level2 } from "./test-types-comprehensive";
+import { isArrayWithEachItem, isType } from "guardz";
+import { isLevel3 } from "./isLevel3";
 
 export const isLevel2 = isType<Level2>({
   mid: isLevel3,
-  midArr: isArrayWithEachItem(isLevel3)
+  midArr: isArrayWithEachItem(isLevel3),
 });

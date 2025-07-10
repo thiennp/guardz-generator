@@ -1,12 +1,12 @@
-import type { EverythingDTO } from './test-types-comprehensive';
-import { isType } from 'guardz';
-import { isArrayTypes } from './isArrayTypes';
-import { isEnumTypes } from './isEnumTypes';
-import { isLevel1 } from './isLevel1';
-import { isNullableTypes } from './isNullableTypes';
-import { isObjectTypes } from './isObjectTypes';
-import { isPrimitiveTypes } from './isPrimitiveTypes';
-import { isSpecialTypes } from './isSpecialTypes';
+import type { EverythingDTO } from "./test-types-comprehensive";
+import { isType } from "guardz";
+import { isArrayTypes } from "./isArrayTypes";
+import { isEnumTypes } from "./isEnumTypes";
+import { isLevel1 } from "./isLevel1";
+import { isNullableTypes } from "./isNullableTypes";
+import { isObjectTypes } from "./isObjectTypes";
+import { isPrimitiveTypes } from "./isPrimitiveTypes";
+import { isSpecialTypes } from "./isSpecialTypes";
 
 export const isEverythingDTO = isType<EverythingDTO>({
   primitives: isPrimitiveTypes,
@@ -15,5 +15,5 @@ export const isEverythingDTO = isType<EverythingDTO>({
   objects: isObjectTypes,
   enums: isEnumTypes,
   specials: isSpecialTypes,
-  nested: isLevel1
+  nested: isLevel1,
 });

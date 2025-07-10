@@ -1,5 +1,13 @@
-import type { PrimitiveTypes } from './test-types-comprehensive';
-import { isAny, isBoolean, isDate, isNumber, isString, isType, isUnknown } from 'guardz';
+import type { PrimitiveTypes } from "./test-types-comprehensive";
+import {
+  isAny,
+  isBoolean,
+  isDate,
+  isNumber,
+  isString,
+  isType,
+  isUnknown,
+} from "guardz";
 
 export const isPrimitiveTypes = isType<PrimitiveTypes>({
   str: isString,
@@ -7,5 +15,5 @@ export const isPrimitiveTypes = isType<PrimitiveTypes>({
   bool: isBoolean,
   anyVal: isAny,
   unknownVal: isUnknown,
-  date: isDate
+  date: isDate,
 });

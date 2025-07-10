@@ -1,5 +1,13 @@
-import type { DeepNestedData } from './complex-test';
-import { isBoolean, isDate, isNonEmptyArrayWithEachItem, isNonEmptyString, isNonNegativeNumber, isPositiveNumber, isType } from 'guardz';
+import type { DeepNestedData } from "./complex-test";
+import {
+  isBoolean,
+  isDate,
+  isNonEmptyArrayWithEachItem,
+  isNonEmptyString,
+  isNonNegativeNumber,
+  isPositiveNumber,
+  isType,
+} from "guardz";
 
 export const isDeepNestedData = isType<DeepNestedData>({
   id: isNonEmptyString,
@@ -9,11 +17,11 @@ export const isDeepNestedData = isType<DeepNestedData>({
   metadata: isType({
     createdAt: isDate,
     updatedAt: isDate,
-    version: isPositiveNumber
+    version: isPositiveNumber,
   }),
   settings: isType({
     enabled: isBoolean,
     timeout: isPositiveNumber,
-    retries: isNonNegativeNumber
-  })
+    retries: isNonNegativeNumber,
+  }),
 });

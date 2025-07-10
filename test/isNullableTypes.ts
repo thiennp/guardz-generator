@@ -1,5 +1,13 @@
-import type { NullableTypes } from './test-types-comprehensive';
-import { isBoolean, isDate, isNullOr, isNumber, isString, isType, isUndefinedOr } from 'guardz';
+import type { NullableTypes } from "./test-types-comprehensive";
+import {
+  isBoolean,
+  isDate,
+  isNullOr,
+  isNumber,
+  isString,
+  isType,
+  isUndefinedOr,
+} from "guardz";
 
 export const isNullableTypes = isType<NullableTypes>({
   maybeStr: isNullOr(isString),
@@ -11,5 +19,5 @@ export const isNullableTypes = isType<NullableTypes>({
   optBool: isUndefinedOr(isBoolean),
   optDate: isUndefinedOr(isDate),
   undefOrStr: isUndefinedOr(isString),
-  undefOrNum: isUndefinedOr(isNumber)
+  undefOrNum: isUndefinedOr(isNumber),
 });
