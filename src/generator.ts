@@ -237,7 +237,6 @@ export class TypeGuardGenerator {
   // Check if an interface is recursive (references itself)
   private isRecursiveType(interfaceDecl: ts.InterfaceDeclaration): boolean {
     const interfaceName = interfaceDecl.name.text;
-    const guardName = `is${interfaceName}`;
     
     // Check if any property references the same interface
     const properties = this.extractProperties(interfaceDecl);
@@ -875,9 +874,6 @@ ${indent}}`;
     outputDir: string,
     needsTypeGuardFnImport?: boolean
   ): string {
-    // Collect enums used in this interface
-    const usedEnums = this.collectUsedEnums(interfaceName);
-    
     // Collect enums used in the generated type guard code
     const usedEnumsInCode = this.collectUsedEnumsInCode(typeGuardCode);
     
@@ -889,10 +885,6 @@ ${indent}}`;
 
     // Only import types that are actually referenced in the generated code
     const usedTypes = importTypes.filter(type => new RegExp(`\\b${type}\\b`).test(typeGuardCode));
-    
-    // Also collect guardz type aliases that appear in the generated code
-    const guardzTypeAliases = ['NonEmptyString', 'NonNegativeNumber', 'PositiveNumber', 'NonEmptyArray', 'Nullable'];
-    const usedGuardzTypes = guardzTypeAliases.filter(type => new RegExp(`\\b${type}\\b`).test(typeGuardCode));
     
     // For each used type, resolve its source file and compute the relative import path
     const typeImportsArr: string[] = [];
