@@ -1,4 +1,4 @@
-import type { SpecialTypes } from './../models/PrimitiveTypes';
+import type { SpecialTypes } from './NestedTypes';
 import { isNonEmptyString, isNonNegativeNumber, isPositiveNumber, isType } from 'guardz';
 
 export const isSpecialTypes = isType<SpecialTypes>({

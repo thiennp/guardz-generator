@@ -1,4 +1,4 @@
-import type { ObjectTypes } from './../models/PrimitiveTypes';
+import type { ObjectTypes } from './NestedTypes';
 import { isBoolean, isNumber, isObjectWithEachItem, isPartialOf, isString, isType } from 'guardz';
 
 export const isObjectTypes = isType<ObjectTypes>({

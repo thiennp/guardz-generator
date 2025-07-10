@@ -153,6 +153,15 @@ export class TypeGuardGenerator {
   }
 
   private generateTypeGuardCode(interfaceDecl: ts.InterfaceDeclaration, guardName: string): string {
+    // Check if this interface has only index signatures (like [k: string]: unknown)
+    if (this.hasOnlyIndexSignatures(interfaceDecl)) {
+      const indexSignatureType = this.extractIndexSignatureType(interfaceDecl);
+      if (indexSignatureType) {
+        const valueTypeGuard = this.convertTypeToGuard(indexSignatureType);
+        return `export const ${guardName} = isObjectWithEachItem(${valueTypeGuard});`;
+      }
+    }
+
     const properties = this.extractProperties(interfaceDecl);
     
     // Check if this interface is recursive (references itself)
@@ -278,6 +287,23 @@ export class TypeGuardGenerator {
       }
     });
     return properties;
+  }
+
+  // Check if interface has only index signatures (like [k: string]: unknown)
+  private hasOnlyIndexSignatures(interfaceDecl: ts.InterfaceDeclaration): boolean {
+    const hasIndexSignature = interfaceDecl.members.some(member => ts.isIndexSignatureDeclaration(member));
+    const hasPropertySignature = interfaceDecl.members.some(member => ts.isPropertySignature(member));
+    return hasIndexSignature && !hasPropertySignature;
+  }
+
+  // Extract index signature type for Record-like interfaces
+  private extractIndexSignatureType(interfaceDecl: ts.InterfaceDeclaration): ts.TypeNode | null {
+    for (const member of interfaceDecl.members) {
+      if (ts.isIndexSignatureDeclaration(member)) {
+        return member.type || null;
+      }
+    }
+    return null;
   }
 
   private extractPropertiesFromTypeLiteral(typeLiteral: ts.TypeLiteralNode): Array<{

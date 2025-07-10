@@ -1,4 +1,4 @@
-import type { NullableTypes } from './../models/PrimitiveTypes';
+import type { NullableTypes } from './EverythingDTO';
 import { isBoolean, isDate, isNullOr, isNumber, isString, isType, isUndefinedOr } from 'guardz';
 
 export const isNullableTypes = isType<NullableTypes>({

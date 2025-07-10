@@ -1,5 +1,5 @@
-import type { EnumTypes } from './../models/PrimitiveTypes';
-import { StatusEnum } from './../models/PrimitiveTypes';
+import type { EnumTypes } from './NestedTypes';
+import { StatusEnum } from './NestedTypes';
 import { isBoolean, isEnum, isEqualTo, isNumber, isOneOf, isOneOfTypes, isString, isType } from 'guardz';
 
 export const isEnumTypes = isType<EnumTypes>({

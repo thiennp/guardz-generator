@@ -1,4 +1,4 @@
-import type { ArrayTypes } from './../models/PrimitiveTypes';
+import type { ArrayTypes } from './NestedTypes';
 import { isArrayWithEachItem, isNullOr, isNumber, isString, isType } from 'guardz';
 
 export const isArrayTypes = isType<ArrayTypes>({

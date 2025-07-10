@@ -1,4 +1,4 @@
-import type { PrimitiveTypes } from './../models/PrimitiveTypes';
+import type { PrimitiveTypes } from './NestedTypes';
 import { isAny, isBoolean, isDate, isNumber, isString, isType, isUnknown } from 'guardz';
 
 export const isPrimitiveTypes = isType<PrimitiveTypes>({
