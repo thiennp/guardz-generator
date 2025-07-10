@@ -773,6 +773,8 @@ ${indent}}`;
             visit(member.type);
           }
         });
+      } else if (ts.isParenthesizedTypeNode(typeNode)) {
+        visit(typeNode.type);
       }
     };
     
@@ -906,21 +908,17 @@ ${indent}}`;
     const guardzImports = usedGuardzUtilities.length > 0 ? `import { ${usedGuardzUtilities.join(', ')} } from 'guardz';` : '';
     // Filter out the current type guard to avoid circular imports
     const filteredTypeGuards = usedTypeGuards.filter(name => name !== guardName && new RegExp(`\\b${name}\\b`).test(typeGuardCode));
-    console.log(`Debug: Found type guards for ${guardName}:`, filteredTypeGuards);
     // Import type guards from their individual files (relative to outputDir)
     const typeGuardImports = filteredTypeGuards.map(name => {
       // Find the actual source file for this type guard
       const typeGuardSourceFile = this.findTypeGuardSourceFile(name);
-      console.log(`Debug: Type guard ${name} source file:`, typeGuardSourceFile);
       if (typeGuardSourceFile) {
         const relPath = './' + path.relative(outputDir, typeGuardSourceFile).replace(/\\/g, '/').replace(/\.ts$/, '');
-        console.log(`Debug: Import path for ${name}:`, relPath);
         return `import { ${name} } from '${relPath}';`;
       }
       // Fallback to same directory if not found
       const guardFile = `${name}.ts`;
       const relPath = './' + path.relative(outputDir, path.join(outputDir, guardFile)).replace(/\\/g, '/').replace(/\.ts$/, '');
-      console.log(`Debug: Fallback import path for ${name}:`, relPath);
       return `import { ${name} } from '${relPath}';`;
     }).join('\n');
     const allImports = [typeImports, enumImports, guardzImports, typeGuardImports].filter(Boolean);
