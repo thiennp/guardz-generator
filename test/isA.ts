@@ -5,4 +5,4 @@ import { isType } from "guardz";
 export const isA = <T, U>(
   typeGuardT: TypeGuardFn<T>,
   typeGuardU: TypeGuardFn<U>,
-) => isType<A<T, U>>({ b: typeGuardT, c: typeGuardU });
+): TypeGuardFn<A<T, U>> => isType<A<T, U>>({ b: typeGuardT, c: typeGuardU });

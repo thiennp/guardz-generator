@@ -303,14 +303,14 @@ export class TypeGuardGenerator {
           )
           .join(', ');
 
-        return `export const ${guardName} = <${formattedTypeParameters.join(', ')}>(${typeGuardParams.join(', ')}) => isType<${genericTypeString}>({ ${propertyGuards} });`;
+        return `export const ${guardName} = <${formattedTypeParameters.join(', ')}>(${typeGuardParams.join(', ')}): TypeGuardFn<${genericTypeString}> => isType<${genericTypeString}>({ ${propertyGuards} });`;
       } else {
         // Simple generic type alias
         const typeGuard = this.convertTypeToGuardForGeneric(
           typeAliasDecl.type,
           typeParameterNames
         );
-        return `export const ${guardName} = <${formattedTypeParameters.join(', ')}>(${typeGuardParams.join(', ')}) => ${typeGuard};`;
+        return `export const ${guardName} = <${formattedTypeParameters.join(', ')}>(${typeGuardParams.join(', ')}): TypeGuardFn<${genericTypeString}> => ${typeGuard};`;
       }
     }
   }
@@ -357,7 +357,7 @@ export class TypeGuardGenerator {
         )
         .join(', ');
 
-      return `export const ${guardName} = <${formattedTypeParameters.join(', ')}>(${typeGuardParams.join(', ')}) => isType<${genericTypeString}>({ ${propertyGuards} });`;
+      return `export const ${guardName} = <${formattedTypeParameters.join(', ')}>(${typeGuardParams.join(', ')}): TypeGuardFn<${genericTypeString}> => isType<${genericTypeString}>({ ${propertyGuards} });`;
     }
   }
 
