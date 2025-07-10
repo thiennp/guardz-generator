@@ -316,6 +316,10 @@ export class TypeGuardGenerator {
       isOptional: boolean;
     }> = [];
     typeLiteral.members.forEach((member: ts.TypeElement) => {
+      // Skip index signatures like [k: string]: unknown
+      if (ts.isIndexSignatureDeclaration(member)) {
+        return;
+      }
       if (ts.isPropertySignature(member) && member.name) {
         const name = member.name.getText();
         const type = member.type;
@@ -454,8 +458,11 @@ export class TypeGuardGenerator {
 
   private handleUnionType(unionType: ts.UnionTypeNode): string {
     const types = unionType.types;
+    const typeText = unionType.getText();
+    console.log(`Debug: handleUnionType called with type: ${typeText}`);
+    console.log(`Debug: Number of types in union: ${types.length}`);
+    
     if (types.length === 2) {
-      const typeText = unionType.getText();
       if (typeText === 'string | null') {
         return 'isNullOr(isString)';
       }
@@ -492,14 +499,77 @@ export class TypeGuardGenerator {
       return `isOneOf(${literalValues.join(', ')})`;
     }
 
+    // Check for union with null or undefined
+    const hasNull = types.some(type => 
+      ts.isLiteralTypeNode(type) && 
+      type.literal.kind === ts.SyntaxKind.NullKeyword
+    );
+    const hasUndefined = types.some(type => 
+      ts.isLiteralTypeNode(type) && 
+      type.literal.kind === ts.SyntaxKind.UndefinedKeyword
+    );
+
+    if (hasNull || hasUndefined) {
+      // Handle cases like ('ltr' | 'rtl') | null or string | null
+      const nonNullTypes = types.filter(type => 
+        !(ts.isLiteralTypeNode(type) && 
+          (type.literal.kind === ts.SyntaxKind.NullKeyword ||
+           type.literal.kind === ts.SyntaxKind.UndefinedKeyword))
+      );
+
+      if (nonNullTypes.length === 1) {
+        // Single non-null type, like ('ltr' | 'rtl') | null
+        let nonNullType = nonNullTypes[0];
+        // Unwrap ParenthesizedTypeNode if present
+        if (ts.isParenthesizedTypeNode(nonNullType)) {
+          nonNullType = nonNullType.type;
+        }
+        // Check if the non-null type is itself a union of literals
+        if (ts.isUnionTypeNode(nonNullType)) {
+          const literalUnion = this.handleUnionType(nonNullType);
+          return hasNull ? `isNullOr(${literalUnion})` : `isUndefinedOr(${literalUnion})`;
+        }
+        // Single type like string | null
+        const guard = this.convertTypeToGuard(nonNullType);
+        return hasNull ? `isNullOr(${guard})` : `isUndefinedOr(${guard})`;
+      }
+    }
+
     // For type unions like string | number | boolean, use isOneOfTypes
     // 1. Extract type names and their corresponding guard expressions
     const typePairs = types.map((type: ts.TypeNode) => {
-      // Use getText() to preserve generic type parameters
-      const typeName = type.getText();
+      // Unwrap ParenthesizedTypeNode if present
+      let actualType = type;
+      if (ts.isParenthesizedTypeNode(actualType)) {
+        actualType = actualType.type;
+      }
+      let typeName = actualType.getText();
+      let guard: string;
+      
+      // Debug logging for each union member
+      console.log(`Debug: Union member typeName: ${typeName}`);
+      console.log(`Debug: Union member node kind: ${actualType.kind}`);
+      console.log(`Debug: Is TypeReferenceNode: ${ts.isTypeReferenceNode(actualType)}`);
+      console.log(`Debug: Is ParenthesizedTypeNode: ${ts.isParenthesizedTypeNode(actualType)}`);
+      console.log(`Debug: Is UnionTypeNode: ${ts.isUnionTypeNode(actualType)}`);
+      
+      if (ts.isTypeReferenceNode(actualType)) {
+        // Use handleTypeReference to get the correct guard for type references
+        guard = this.handleTypeReference(actualType);
+        console.log(`Debug: TypeReferenceNode guard: ${guard}`);
+      } else if (this.isInterfaceType(typeName)) {
+        // Fallback: if typeName matches a known interface, use its type guard
+        guard = `is${typeName}`;
+        console.log(`Debug: Interface fallback guard: ${guard}`);
+      } else {
+        guard = this.convertTypeToGuard(actualType);
+        console.log(`Debug: Default guard: ${guard}`);
+      }
+      
+      console.log(`Debug: Final guard for ${typeName}: ${guard}`);
       return {
         typeName,
-        guard: this.convertTypeToGuard(type)
+        guard
       };
     });
     // 2. Sort by typeName alphabetically
@@ -602,6 +672,10 @@ export class TypeGuardGenerator {
   private handleTypeLiteral(typeLiteral: ts.TypeLiteralNode, wrapInIsType: boolean = true, indent: string = '  '): string {
     const nextIndent = indent + '  ';
     const properties = typeLiteral.members.map((member: ts.TypeElement) => {
+      // Skip index signatures like [k: string]: unknown
+      if (ts.isIndexSignatureDeclaration(member)) {
+        return '';
+      }
       if (ts.isPropertySignature(member) && member.name && member.type) {
         const name = member.name.getText();
         let typeGuard: string;
@@ -627,8 +701,22 @@ ${indent}}`;
   }
 
   private handleArrayType(arrayType: ts.ArrayTypeNode): string {
-    const elementType = this.convertTypeToGuard(arrayType.elementType);
-    return `isArrayWithEachItem(${elementType})`;
+    // If the element type is a union, generate isArrayWithEachItem(isOneOfTypes<...>(...))
+    let elementType = arrayType.elementType;
+    
+    // Unwrap ParenthesizedTypeNode if present
+    if (ts.isParenthesizedTypeNode(elementType)) {
+      elementType = elementType.type;
+    }
+    
+    if (ts.isUnionTypeNode(elementType)) {
+      // For union types, use handleUnionType to get the correct guard
+      const unionGuard = this.handleUnionType(elementType);
+      return `isArrayWithEachItem(${unionGuard})`;
+    }
+    // Otherwise, use the regular element type guard
+    const elementGuard = this.convertTypeToGuard(elementType);
+    return `isArrayWithEachItem(${elementGuard})`;
   }
 
   private handleLiteralType(literalType: ts.LiteralTypeNode): string {
@@ -717,6 +805,10 @@ ${indent}}`;
   private handleTypeLiteralForGeneric(typeLiteral: ts.TypeLiteralNode, typeParameterNames: string[], indent: string = '  '): string {
     const nextIndent = indent + '  ';
     const properties = typeLiteral.members.map((member: ts.TypeElement) => {
+      // Skip index signatures like [k: string]: unknown
+      if (ts.isIndexSignatureDeclaration(member)) {
+        return '';
+      }
       if (ts.isPropertySignature(member) && member.name && member.type) {
         const name = member.name.getText();
         let typeGuard: string;
@@ -986,11 +1078,9 @@ ${indent}}`;
   private collectUsedGuardzUtilities(typeGuardCode: string): string[] {
     const usedUtilities = new Set<string>();
     
-    // Always include isType since it's the base function
-    usedUtilities.add('isType');
-    
     // Check for specific utilities in the generated code using word boundaries
     const utilityChecks = [
+      { pattern: /\bisType\b/, utility: 'isType' },
       { pattern: /\bisString\b/, utility: 'isString' },
       { pattern: /\bisNumber\b/, utility: 'isNumber' },
       { pattern: /\bisBoolean\b/, utility: 'isBoolean' },
