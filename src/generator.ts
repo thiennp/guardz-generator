@@ -400,8 +400,8 @@ export class TypeGuardGenerator {
     name: string;
     type: ts.TypeNode;
     isOptional: boolean;
-  }): string {
-    const typeGuard = this.convertTypeToGuard(property.type);
+  }, typeParameterNames?: string[]): string {
+    const typeGuard = this.convertTypeToGuard(property.type, typeParameterNames);
     console.log(`Debug: Property ${property.name} generated guard: ${typeGuard}`);
     if (property.isOptional) {
       return `${property.name}: isUndefinedOr(${typeGuard})`;
@@ -424,15 +424,15 @@ export class TypeGuardGenerator {
     }
   }
 
-  private convertTypeToGuard(typeNode: ts.TypeNode): string {
+  private convertTypeToGuard(typeNode: ts.TypeNode, typeParameterNames?: string[]): string {
     if (ts.isUnionTypeNode(typeNode)) {
-      return this.handleUnionType(typeNode);
+      return this.handleUnionType(typeNode, typeParameterNames);
     } else if (ts.isTypeReferenceNode(typeNode)) {
-      return this.handleTypeReference(typeNode);
+      return typeParameterNames ? this.handleTypeReferenceForGeneric(typeNode, typeParameterNames) : this.handleTypeReference(typeNode);
     } else if (ts.isTypeLiteralNode(typeNode)) {
-      return this.handleTypeLiteral(typeNode);
+      return typeParameterNames ? this.handleTypeLiteralForGeneric(typeNode, typeParameterNames) : this.handleTypeLiteral(typeNode);
     } else if (ts.isArrayTypeNode(typeNode)) {
-      return this.handleArrayType(typeNode);
+      return typeParameterNames ? this.handleArrayTypeForGeneric(typeNode, typeParameterNames) : this.handleArrayType(typeNode);
     } else if (ts.isLiteralTypeNode(typeNode)) {
       return this.handleLiteralType(typeNode);
     } else {
@@ -456,7 +456,7 @@ export class TypeGuardGenerator {
     }
   }
 
-  private handleUnionType(unionType: ts.UnionTypeNode): string {
+  private handleUnionType(unionType: ts.UnionTypeNode, typeParameterNames?: string[]): string {
     const types = unionType.types;
     const typeText = unionType.getText();
     console.log(`Debug: handleUnionType called with type: ${typeText}`);
@@ -526,11 +526,11 @@ export class TypeGuardGenerator {
         }
         // Check if the non-null type is itself a union of literals
         if (ts.isUnionTypeNode(nonNullType)) {
-          const literalUnion = this.handleUnionType(nonNullType);
+          const literalUnion = this.handleUnionType(nonNullType, typeParameterNames);
           return hasNull ? `isNullOr(${literalUnion})` : `isUndefinedOr(${literalUnion})`;
         }
         // Single type like string | null
-        const guard = this.convertTypeToGuard(nonNullType);
+        const guard = typeParameterNames ? this.convertTypeToGuardForGeneric(nonNullType, typeParameterNames) : this.convertTypeToGuard(nonNullType);
         return hasNull ? `isNullOr(${guard})` : `isUndefinedOr(${guard})`;
       }
     }
@@ -554,15 +554,20 @@ export class TypeGuardGenerator {
       console.log(`Debug: Is UnionTypeNode: ${ts.isUnionTypeNode(actualType)}`);
       
       if (ts.isTypeReferenceNode(actualType)) {
-        // Use handleTypeReference to get the correct guard for type references
-        guard = this.handleTypeReference(actualType);
-        console.log(`Debug: TypeReferenceNode guard: ${guard}`);
+        // Use appropriate type reference handler based on whether we have type parameters
+        if (typeParameterNames && typeParameterNames.includes(typeName)) {
+          guard = `typeGuard${typeName}`;
+          console.log(`Debug: Generic type parameter guard: ${guard}`);
+        } else {
+          guard = typeParameterNames ? this.handleTypeReferenceForGeneric(actualType, typeParameterNames) : this.handleTypeReference(actualType);
+          console.log(`Debug: TypeReferenceNode guard: ${guard}`);
+        }
       } else if (this.isInterfaceType(typeName)) {
         // Fallback: if typeName matches a known interface, use its type guard
         guard = `is${typeName}`;
         console.log(`Debug: Interface fallback guard: ${guard}`);
       } else {
-        guard = this.convertTypeToGuard(actualType);
+        guard = typeParameterNames ? this.convertTypeToGuardForGeneric(actualType, typeParameterNames) : this.convertTypeToGuard(actualType);
         console.log(`Debug: Default guard: ${guard}`);
       }
       
@@ -796,6 +801,11 @@ ${indent}}`;
     // Check if this is a generic type parameter
     if (typeParameterNames.includes(typeName)) {
       return `typeGuard${typeName}`;
+    }
+    
+    // Check if this is an interface that has a corresponding type guard
+    if (this.isInterfaceType(typeName)) {
+      return `is${typeName}(typeGuardT)`;
     }
     
     // Otherwise, use regular type reference handling
